@@ -26,7 +26,15 @@
       {
         "id": "jscad",
         "extensions": [".jscad"],
-        "aliases": ["JSCAD"]
+        "aliases": ["JSCAD"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "jscad",
+        "scopeName": "source.js",
+        "path": "./syntaxes/jscad.tmLanguage.json"
       }
     ]
   },
