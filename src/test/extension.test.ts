@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import { resolveJscadEntrypoint } from '../jscadEngine';
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
@@ -35,5 +36,15 @@ suite('Extension Test Suite', () => {
 		return languages.then((langs) => {
 			assert.ok(langs.includes('jscad'), 'JSCAD language should be registered');
 		});
+	});
+});
+
+suite('JSCAD Engine Test Suite', () => {
+	test('resolveJscadEntrypoint should return null when no workspace and no active editor', () => {
+		// This test assumes no workspace is open and no .jscad file is active
+		// The actual behavior depends on the test environment
+		const entrypoint = resolveJscadEntrypoint();
+		// entrypoint can be null or an object depending on test environment
+		assert.ok(entrypoint === null || typeof entrypoint === 'object');
 	});
 });

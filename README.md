@@ -1,15 +1,48 @@
 # HootCAD
 
-VS Code extension to view JSCAD files
+VS Code extension to view and render JSCAD files in 3D
 
 ## Features
 
+- **JSCAD 3D Rendering** - Execute and visualize JSCAD scripts in real-time
+- **Smart Entrypoint Resolution** - Automatically finds your JSCAD entrypoint via package.json, index.jscad, or active editor
+- **Interactive 3D Viewer** - WebGL-based rendering with camera controls (rotate with mouse drag, zoom with mouse wheel)
 - **HootCAD: Open Preview** command to open a preview panel
 - Activates automatically when opening `.jscad` files
-- Webview panel with bidirectional messaging between extension and webview
-- File save watcher that updates status when `.jscad` files are saved
-- Output channel "HootCAD" for logging
-- Status bar indicator showing current file and save status
+- Output channel "HootCAD" for logging and error messages
+- Status bar indicator showing current file and execution status
+
+## Quick Start
+
+1. Install the extension
+2. Open a `.jscad` file (see `examples/` directory for samples)
+3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) and run **HootCAD: Open Preview**
+4. View your 3D geometry in the preview panel
+5. Interact with the 3D view:
+   - **Left click + drag**: Rotate camera
+   - **Mouse wheel**: Zoom in/out
+
+## JSCAD Entrypoint Resolution
+
+HootCAD automatically finds your JSCAD entrypoint using this priority:
+
+1. **package.json main field** - If exists and points to a `.jscad` file
+2. **index.jscad** - At workspace root
+3. **Active editor** - Currently open `.jscad` file
+
+If no entrypoint is found, an error message will guide you.
+
+## Example JSCAD File
+
+```javascript
+const { cube } = require('@jscad/modeling').primitives
+
+const main = () => cube({ size: 10 })
+
+module.exports = { main }
+```
+
+See the `examples/` directory for more examples including sphere, snowman, and other shapes.
 
 ## Development
 
@@ -93,26 +126,46 @@ npm test
 
 ## Usage
 
-1. Open a `.jscad` file in VS Code
+1. Open a `.jscad` file in VS Code (or create one - see examples below)
 2. The extension will activate automatically
 3. Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P`)
-4. Run "HootCAD: Open Preview"
-5. The preview panel will open with:
-   - A title
-   - A placeholder area for future JSCAD rendering
-   - Status text that updates when files are saved
-   - A test button to verify webview messaging
+4. Run **HootCAD: Open Preview**
+5. The 3D preview panel will open showing your rendered geometry
+6. Interact with the 3D view using mouse controls
+7. Check the "HootCAD" output channel for execution logs and errors
+
+### Example JSCAD Files
+
+The `examples/` directory contains sample files:
+- `cube.jscad` - Simple cube
+- `sphere.jscad` - Sphere
+- `snowman.jscad` - Complex model with multiple primitives
 
 ## Project Structure
 
-- `src/extension.ts` - Main extension code
+- `src/extension.ts` - Main extension code and webview management
+- `src/jscadEngine.ts` - JSCAD execution and geometry serialization
+- `examples/` - Sample JSCAD files
 - `package.json` - Extension manifest
 - `tsconfig.json` - TypeScript configuration
 - `webpack.config.js` - Webpack bundler configuration
 - `.vscode/` - VS Code workspace settings and launch configurations
 
-## Notes
+## Current Scope
 
-- This version focuses on scaffolding and the development loop
-- JSCAD library integration and 3D rendering will be added in future versions
-- The webview supports bidirectional messaging for future interactivity
+This is a v0.5 implementation focused on core rendering functionality:
+
+✅ **Implemented:**
+- Execute JSCAD files with `main()` function
+- Render 3D geometry (geom3) in WebGL viewer
+- Smart entrypoint resolution
+- Basic camera controls (rotate, zoom)
+- Error handling and logging
+
+❌ **Not yet implemented (future milestones):**
+- Parameter UI (`getParameterDefinitions`)
+- Multi-file dependency tracking
+- File watching and auto-refresh
+- Export to STL/OBJ/STEP
+- Advanced rendering (lighting, materials, shadows)
+- 2D geometry rendering optimization

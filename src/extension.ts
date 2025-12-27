@@ -26,18 +26,18 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(openPreviewCommand);
 
 	// Watch for file saves
-	const saveWatcher = vscode.workspace.onDidSaveTextDocument((document) => {
+	const saveWatcher = vscode.workspace.onDidSaveTextDocument(async (document) => {
 		if (document.fileName.endsWith('.jscad')) {
 			const fileName = document.fileName.split('/').pop() || document.fileName;
 			outputChannel.appendLine(`File saved: ${fileName}`);
 			statusBarItem.text = `HootCAD: Saved ${fileName}`;
 			
-			// Send message to webview if it exists
+			// Re-execute and re-render if panel is open
 			if (currentPanel) {
-				currentPanel.webview.postMessage({
-					type: 'fileSaved',
-					fileName: fileName
-				});
+				const entrypoint = resolveJscadEntrypoint();
+				if (entrypoint) {
+					await executeAndRender(entrypoint.filePath);
+				}
 			}
 			
 			// Reset status after 3 seconds
