@@ -4,6 +4,10 @@
   "description": "VS Code extension to view JSCAD files",
   "version": "0.0.1",
   "publisher": "hootcad",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joelmartinez/hootcad"
+  },
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -25,8 +29,12 @@
     "languages": [
       {
         "id": "jscad",
-        "extensions": [".jscad"],
-        "aliases": ["JSCAD"],
+        "extensions": [
+          ".jscad"
+        ],
+        "aliases": [
+          "JSCAD"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -47,19 +55,21 @@
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "package:vsix": "vsce package --skip-license"
   },
   "devDependencies": {
-    "@types/vscode": "^1.107.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.48.1",
-    "eslint": "^9.39.1",
-    "typescript": "^5.9.3",
-    "ts-loader": "^9.5.4",
-    "webpack": "^5.103.0",
-    "webpack-cli": "^6.0.1",
+    "@types/vscode": "^1.107.0",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^9.39.1",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.1",
+    "webpack": "^5.103.0",
+    "webpack-cli": "^6.0.1"
   }
 }
