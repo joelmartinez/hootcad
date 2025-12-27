@@ -1,0 +1,9 @@
+{
+  "scopeName": "source.js",
+  "injectionSelector": "L:source.js",
+  "patterns": [
+    {
+      "include": "source.js"
+    }
+  ]
+}
