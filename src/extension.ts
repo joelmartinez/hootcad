@@ -1040,10 +1040,10 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 						let value = input.value;
 						if (def.type === 'number') {
 							const parsed = parseFloat(value);
-							value = isNaN(parsed) ? (def.initial || 0) : parsed;
+							value = isNaN(parsed) ? (def.initial ?? 0) : parsed;
 						} else if (def.type === 'int') {
 							const parsed = parseInt(value);
-							value = isNaN(parsed) ? (def.initial || 0) : parsed;
+							value = isNaN(parsed) ? (def.initial ?? 0) : parsed;
 						}
 						sendParameterChange(def.name, value);
 					});

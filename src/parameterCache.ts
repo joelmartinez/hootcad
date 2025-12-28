@@ -53,6 +53,7 @@ export class ParameterCache {
             } else if (def.type === 'choice' && def.initial !== undefined) {
                 merged[def.name] = def.initial;
             } else if (def.type === 'choice' && def.values && def.values.length > 0) {
+                // Use first value as default when no initial value specified
                 merged[def.name] = def.values[0];
             } else if (def.initial !== undefined) {
                 merged[def.name] = def.initial;

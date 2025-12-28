@@ -402,11 +402,8 @@ module.exports = { main, getParameterDefinitions }
 				assert.strictEqual(definitions[1].type, 'checkbox', 'Should have checkbox type');
 			} finally {
 				// Clean up
-				if (fs.existsSync(filePath)) {
-					fs.unlinkSync(filePath);
-				}
 				if (fs.existsSync(testDir)) {
-					fs.rmdirSync(testDir);
+					fs.rmSync(testDir, { recursive: true });
 				}
 			}
 		});
@@ -443,11 +440,8 @@ module.exports = { main }
 				// We can't directly verify the size, but we can verify execution succeeded
 			} finally {
 				// Clean up
-				if (fs.existsSync(filePath)) {
-					fs.unlinkSync(filePath);
-				}
 				if (fs.existsSync(testDir)) {
-					fs.rmdirSync(testDir);
+					fs.rmSync(testDir, { recursive: true });
 				}
 			}
 		});
