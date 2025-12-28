@@ -907,6 +907,21 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			collapseButton.textContent = isCollapsed ? '▶' : '▼';
 		});
 
+		function sendParameterChange(name, value) {
+			console.log('Parameter changed:', name, value);
+			vscode.postMessage({
+				type: 'parameterChanged',
+				name: name,
+				value: value,
+				filePath: currentFilePath
+			});
+		}
+
+		// Helper function to determine if parameter should use slider input
+		function shouldUseSlider(def) {
+			return def.type === 'slider' || (def.type === 'number' && def.min !== undefined && def.max !== undefined);
+		}
+
 		function updateParameterPanel(parameters) {
 			const { definitions, values, filePath } = parameters;
 			currentFilePath = filePath;
@@ -967,7 +982,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					});
 					
 					paramDiv.appendChild(input);
-				} else if (def.type === 'slider' || (def.type === 'number' && def.min !== undefined && def.max !== undefined)) {
+				} else if (shouldUseSlider(def)) {
 					paramDiv.appendChild(label);
 					
 					input = document.createElement('input');
@@ -1024,9 +1039,11 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					input.addEventListener('change', () => {
 						let value = input.value;
 						if (def.type === 'number') {
-							value = parseFloat(value);
+							const parsed = parseFloat(value);
+							value = isNaN(parsed) ? (def.initial || 0) : parsed;
 						} else if (def.type === 'int') {
-							value = parseInt(value);
+							const parsed = parseInt(value);
+							value = isNaN(parsed) ? (def.initial || 0) : parsed;
 						}
 						sendParameterChange(def.name, value);
 					});
@@ -1039,16 +1056,6 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 
 			// Show the panel
 			parameterPanel.classList.add('visible');
-		}
-
-		function sendParameterChange(name, value) {
-			console.log('Parameter changed:', name, value);
-			vscode.postMessage({
-				type: 'parameterChanged',
-				name: name,
-				value: value,
-				filePath: currentFilePath
-			});
 		}
 
 		// Initialize renderer and notify extension we're ready
