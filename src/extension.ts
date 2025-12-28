@@ -28,7 +28,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Watch for file saves
 	const saveWatcher = vscode.workspace.onDidSaveTextDocument(async (document) => {
 		if (document.fileName.endsWith('.jscad')) {
-			const fileName = document.fileName.split('/').pop() || document.fileName;
+			const fileName = document.fileName.split(/[/\\]/).pop() || document.fileName;
 			outputChannel.appendLine(`File saved: ${fileName}`);
 			statusBarItem.text = `HootCAD: Saved ${fileName}`;
 			
@@ -51,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Watch for active editor changes
 	const editorWatcher = vscode.window.onDidChangeActiveTextEditor((editor) => {
 		if (editor && editor.document.fileName.endsWith('.jscad')) {
-			const fileName = editor.document.fileName.split('/').pop() || editor.document.fileName;
+			const fileName = editor.document.fileName.split(/[/\\]/).pop() || editor.document.fileName;
 			outputChannel.appendLine(`Active file: ${fileName}`);
 			statusBarItem.text = `HootCAD: ${fileName}`;
 		}
