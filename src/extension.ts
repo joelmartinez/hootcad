@@ -5,6 +5,25 @@ let outputChannel: vscode.OutputChannel;
 let currentPanel: vscode.WebviewPanel | undefined;
 let statusBarItem: vscode.StatusBarItem;
 
+/**
+ * Extracts the filename from a file path, handling both Unix and Windows path separators.
+ * @param filePath The full file path
+ * @returns The filename, or 'preview' as fallback
+ */
+export function extractFilename(filePath: string): string {
+	return filePath.split(/[/\\]/).pop() || 'preview';
+}
+
+/**
+ * Formats a preview window title with the owl emoji and filename.
+ * @param filePath The full file path
+ * @returns The formatted title (e.g., "🦉 filename.jscad")
+ */
+export function formatPreviewTitle(filePath: string): string {
+	const fileName = extractFilename(filePath);
+	return `🦉 ${fileName}`;
+}
+
 export function activate(context: vscode.ExtensionContext) {
 	// Create output channel
 	outputChannel = vscode.window.createOutputChannel("HootCAD");
@@ -28,7 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Watch for file saves
 	const saveWatcher = vscode.workspace.onDidSaveTextDocument(async (document) => {
 		if (document.fileName.endsWith('.jscad')) {
-			const fileName = document.fileName.split(/[/\\]/).pop() || document.fileName;
+			const fileName = extractFilename(document.fileName);
 			outputChannel.appendLine(`File saved: ${fileName}`);
 			statusBarItem.text = `HootCAD: Saved ${fileName}`;
 			
@@ -51,7 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// Watch for active editor changes
 	const editorWatcher = vscode.window.onDidChangeActiveTextEditor((editor) => {
 		if (editor && editor.document.fileName.endsWith('.jscad')) {
-			const fileName = editor.document.fileName.split(/[/\\]/).pop() || editor.document.fileName;
+			const fileName = extractFilename(editor.document.fileName);
 			outputChannel.appendLine(`Active file: ${fileName}`);
 			statusBarItem.text = `HootCAD: ${fileName}`;
 		}
@@ -72,9 +91,8 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 
 	outputChannel.appendLine(`Resolved entrypoint: ${entrypoint.filePath} (source: ${entrypoint.source})`);
 
-	// Extract filename for the title
-	const fileName = entrypoint.filePath.split(/[/\\]/).pop() || 'preview';
-	const title = `🦉 ${fileName}`;
+	// Format the preview window title
+	const title = formatPreviewTitle(entrypoint.filePath);
 
 	// If panel already exists, reveal it
 	if (currentPanel) {

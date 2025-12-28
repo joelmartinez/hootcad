@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { resolveJscadEntrypoint } from '../jscadEngine';
+import { extractFilename, formatPreviewTitle } from '../extension';
 
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
@@ -41,24 +42,23 @@ suite('Extension Test Suite', () => {
 	test('Preview window title formatting', () => {
 		// Test Unix-style path
 		const unixPath = '/path/to/file/example.jscad';
-		const unixFileName = unixPath.split(/[/\\]/).pop() || 'preview';
-		assert.strictEqual(unixFileName, 'example.jscad', 'Should extract filename from Unix path');
-		assert.strictEqual(`🦉 ${unixFileName}`, '🦉 example.jscad', 'Should format title with owl emoji');
+		assert.strictEqual(extractFilename(unixPath), 'example.jscad', 'Should extract filename from Unix path');
+		assert.strictEqual(formatPreviewTitle(unixPath), '🦉 example.jscad', 'Should format title with owl emoji');
 
 		// Test Windows-style path
 		const windowsPath = 'C:\\Users\\file\\test.jscad';
-		const windowsFileName = windowsPath.split(/[/\\]/).pop() || 'preview';
-		assert.strictEqual(windowsFileName, 'test.jscad', 'Should extract filename from Windows path');
+		assert.strictEqual(extractFilename(windowsPath), 'test.jscad', 'Should extract filename from Windows path');
+		assert.strictEqual(formatPreviewTitle(windowsPath), '🦉 test.jscad', 'Should format Windows path title');
 
 		// Test filename without directory
 		const bareFilename = 'file.jscad';
-		const bareFileName = bareFilename.split(/[/\\]/).pop() || 'preview';
-		assert.strictEqual(bareFileName, 'file.jscad', 'Should handle filename without directory');
+		assert.strictEqual(extractFilename(bareFilename), 'file.jscad', 'Should handle filename without directory');
+		assert.strictEqual(formatPreviewTitle(bareFilename), '🦉 file.jscad', 'Should format bare filename title');
 
 		// Test fallback
 		const emptyPath = '';
-		const fallbackName = emptyPath.split(/[/\\]/).pop() || 'preview';
-		assert.strictEqual(fallbackName, 'preview', 'Should use fallback for empty path');
+		assert.strictEqual(extractFilename(emptyPath), 'preview', 'Should use fallback for empty path');
+		assert.strictEqual(formatPreviewTitle(emptyPath), '🦉 preview', 'Should format fallback title');
 	});
 });
 
