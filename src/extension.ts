@@ -278,29 +278,149 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				canvas.height = container.clientHeight;
 
 				// Initialize the official JSCAD regl-renderer
-				const rendererOptions = {
-					glOptions: { 
-						canvas: canvas,
-						preserveDrawingBuffer: true
-					}
+				const { prepareRender, cameras, controls } = jscadReglRenderer;
+				
+				// Set up camera with defaults and ensure all properties are set
+				const perspectiveCamera = cameras.perspective;
+				let camera = Object.assign({}, perspectiveCamera.defaults);
+				
+				// Update camera projection for canvas size
+				camera = perspectiveCamera.setProjection(camera, camera, {
+					width: canvas.width,
+					height: canvas.height
+				});
+				
+				// Update camera view matrix
+				camera = perspectiveCamera.update(camera, camera);
+				
+				console.log('Initialized camera:', camera);
+				
+				// Set up orbit controls with defaults
+				const orbitControls = controls.orbit;
+				let controlState = Object.assign({}, orbitControls.defaults);
+				
+				console.log('Initialized controls:', controlState);
+				
+				// Prepare renderer with canvas
+				const renderOptions = {
+					glOptions: { canvas }
 				};
 				
-				renderer = jscadReglRenderer(rendererOptions);
+				const renderFunc = prepareRender(renderOptions);
 				
-				// Set up camera with reasonable defaults
-				const perspectiveCamera = renderer.camera.setProjection({
-					fov: 45,
-					near: 0.1,
-					far: 1000
-				});
-				renderer.camera.setPosition([0, 0, 100]);
-				renderer.camera.setTarget([0, 0, 0]);
+				// Store everything we need for rendering
+				renderer = {
+					render: renderFunc,
+					camera: camera,
+					controls: controlState,
+					orbitControls: orbitControls,
+					perspectiveCamera: perspectiveCamera,
+					drawCommands: jscadReglRenderer.drawCommands
+				};
+				
+				console.log('Renderer initialized:', renderer);
+				
+				// Set up mouse controls
+				setupMouseControls();
 				
 				statusElement.textContent = 'Status: Renderer initialized';
 				return true;
 			} catch (error) {
+				console.error('Init error:', error);
 				showError('Failed to initialize renderer: ' + error.message);
 				return false;
+			}
+		}
+		
+		function setupMouseControls() {
+			let isDragging = false;
+			let lastX = 0;
+			let lastY = 0;
+			
+			canvas.addEventListener('mousedown', (e) => {
+				isDragging = true;
+				lastX = e.clientX;
+				lastY = e.clientY;
+			});
+			
+			canvas.addEventListener('mousemove', (e) => {
+				if (isDragging && renderer) {
+					const deltaX = e.clientX - lastX;
+					const deltaY = e.clientY - lastY;
+					
+					renderer.controls = renderer.orbitControls.rotate(
+						renderer.controls,
+						{ speed: 1, normalizedDelta: [deltaX / 100, deltaY / 100] }
+					);
+					
+					lastX = e.clientX;
+					lastY = e.clientY;
+					
+					// Re-render with updated camera
+					if (currentEntities.length > 0) {
+						renderScene();
+					}
+				}
+			});
+			
+			canvas.addEventListener('mouseup', () => {
+				isDragging = false;
+			});
+			
+			canvas.addEventListener('wheel', (e) => {
+				e.preventDefault();
+				if (renderer) {
+					const delta = e.deltaY > 0 ? 1.1 : 0.9;
+					renderer.controls = renderer.orbitControls.zoom(
+						renderer.controls,
+						delta
+					);
+					
+					// Re-render with updated camera
+					if (currentEntities.length > 0) {
+						renderScene();
+					}
+				}
+			});
+		}
+
+		function renderScene() {
+			if (!renderer || !currentEntities || currentEntities.length === 0) {
+				console.log('Skipping render:', { hasRenderer: !!renderer, entityCount: currentEntities?.length });
+				return;
+			}
+			
+			try {
+				console.log('Rendering...', { entityCount: currentEntities.length });
+				
+				// Update camera from controls - merge the updates back into both camera and controls
+				const updated = renderer.orbitControls.update({
+					controls: renderer.controls,
+					camera: renderer.camera
+				});
+				
+				// Merge updated properties back (don't replace the whole objects)
+				renderer.camera = Object.assign({}, renderer.camera, updated.camera);
+				renderer.controls = Object.assign({}, renderer.controls, updated.controls);
+				
+				console.log('About to call renderer.render with:', { 
+					cameraKeys: Object.keys(renderer.camera),
+					viewport: renderer.camera.viewport,
+					entityCount: currentEntities.length 
+				});
+				
+				// Render the scene
+				renderer.render({
+					camera: renderer.camera,
+					drawCommands: renderer.drawCommands,
+					entities: currentEntities
+				});
+				
+				console.log('Render complete!');
+			} catch (error) {
+				console.error('Render error:', error);
+				console.error('Error stack:', error.stack);
+				showError('Render error: ' + error.message);
 			}
 		}
 
@@ -311,11 +431,44 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			}
 
 			try {
+				// Convert arrays back to typed arrays for rendering
+				const processedEntities = entities.map(entity => {
+					const processed = {
+						visuals: entity.visuals,
+						geometry: {
+							type: entity.geometry.type,
+							isTransparent: entity.geometry.isTransparent
+						}
+					};
+					
+					// Convert regular arrays back to typed arrays
+					if (entity.geometry.positions) {
+						processed.geometry.positions = new Float32Array(entity.geometry.positions);
+					}
+					if (entity.geometry.normals) {
+						processed.geometry.normals = new Float32Array(entity.geometry.normals);
+					}
+					if (entity.geometry.indices) {
+						processed.geometry.indices = new Uint32Array(entity.geometry.indices);
+					}
+					if (entity.geometry.colors) {
+						processed.geometry.colors = new Float32Array(entity.geometry.colors);
+					}
+					if (entity.geometry.transforms) {
+						processed.geometry.transforms = new Float32Array(entity.geometry.transforms);
+					}
+					if (entity.geometry.points) {
+						processed.geometry.points = new Float32Array(entity.geometry.points);
+					}
+					
+					return processed;
+				});
+				
 				// Store entities for re-rendering on resize
-				currentEntities = entities;
+				currentEntities = processedEntities;
 
 				// Render the scene with the pre-converted entities
-				renderer.render({ entities: currentEntities });
+				renderScene();
 				
 				loadingElement.style.display = 'none';
 				statusElement.textContent = \`Status: Rendered \${entities.length} entit\${entities.length === 1 ? 'y' : 'ies'}\`;
@@ -338,9 +491,17 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				canvas.width = container.clientWidth;
 				canvas.height = container.clientHeight;
 				
+				// Update camera projection with new canvas size - merge results
+				const updated = renderer.perspectiveCamera.setProjection(
+					renderer.camera,
+					renderer.camera,
+					{ width: canvas.width, height: canvas.height }
+				);
+				renderer.camera = Object.assign({}, renderer.camera, updated);
+				
 				// Re-render on resize
 				if (currentEntities.length > 0) {
-					renderer.render({ entities: currentEntities });
+					renderScene();
 				}
 			}
 		});

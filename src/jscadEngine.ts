@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { createRequire } from 'module';
 
 export interface JscadEntrypoint {
     filePath: string;
@@ -71,15 +72,35 @@ function resolveFromActiveEditor(): JscadEntrypoint | null {
  * Executes a JSCAD file and returns renderer-ready entities
  */
 export async function executeJscadFile(filePath: string, outputChannel: vscode.OutputChannel): Promise<any[]> {
+    // Use eval to get the real Node.js require (bypasses webpack)
+    const nodeRequire = eval('require');
+    
+    // Create a require function from the extension's context so it can find @jscad modules
+    const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
+    
     try {
         outputChannel.appendLine(`Executing JSCAD file: ${filePath}`);
 
-        // Clear require cache to ensure fresh execution
-        const absolutePath = path.resolve(filePath);
-        delete require.cache[absolutePath];
-
-        // Dynamically require the JSCAD file
-        const jscadModule = require(absolutePath);
+        // Read the file content
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        
+        // Create a custom require that tries both the file's directory and extension's node_modules
+        const customRequire = (moduleName: string) => {
+            try {
+                // First try to require from the file's directory
+                return nodeRequire(moduleName);
+            } catch (e) {
+                // Fallback to extension's node_modules
+                return extensionRequire(moduleName);
+            }
+        };
+        
+        // Execute the JSCAD file in a custom context
+        const module = { exports: {} };
+        const wrapper = new Function('require', 'module', 'exports', '__filename', '__dirname', fileContent);
+        wrapper(customRequire, module, module.exports, filePath, path.dirname(filePath));
+        
+        const jscadModule = module.exports as any;
 
         // Check if main function exists
         if (!jscadModule.main || typeof jscadModule.main !== 'function') {
@@ -95,8 +116,8 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
         // Ensure result is an array
         const geometries = Array.isArray(result) ? result : [result];
         
-        // Import entitiesFromSolids at runtime to avoid webpack bundling issues
-        const { entitiesFromSolids } = require('@jscad/regl-renderer');
+        // Import entitiesFromSolids at runtime using native require
+        const { entitiesFromSolids } = extensionRequire('@jscad/regl-renderer');
         
         // Convert geometries to renderer entities
         // This handles geometry type detection (2D vs 3D) and assigns proper draw commands
@@ -104,7 +125,40 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
         
         outputChannel.appendLine(`Converted ${geometries.length} geometry object(s) to ${entities.length} render entit${entities.length === 1 ? 'y' : 'ies'}`);
         
-        return entities;
+        // Serialize entities for webview (convert typed arrays to regular arrays)
+        const serializedEntities = entities.map((entity: any) => {
+            const serialized: any = {
+                visuals: entity.visuals,
+                geometry: {
+                    type: entity.geometry.type,
+                    isTransparent: entity.geometry.isTransparent
+                }
+            };
+            
+            // Convert typed arrays to regular arrays for JSON serialization
+            if (entity.geometry.positions) {
+                serialized.geometry.positions = Array.from(entity.geometry.positions);
+            }
+            if (entity.geometry.normals) {
+                serialized.geometry.normals = Array.from(entity.geometry.normals);
+            }
+            if (entity.geometry.indices) {
+                serialized.geometry.indices = Array.from(entity.geometry.indices);
+            }
+            if (entity.geometry.colors) {
+                serialized.geometry.colors = Array.from(entity.geometry.colors);
+            }
+            if (entity.geometry.transforms) {
+                serialized.geometry.transforms = Array.from(entity.geometry.transforms);
+            }
+            if (entity.geometry.points) {
+                serialized.geometry.points = Array.from(entity.geometry.points);
+            }
+            
+            return serialized;
+        });
+        
+        return serializedEntities;
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         outputChannel.appendLine(`Error executing JSCAD file: ${errorMessage}`);
