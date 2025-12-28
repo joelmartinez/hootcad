@@ -209,8 +209,12 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
         outputChannel.appendLine(`Raw geometries (${geometries.length}):`);
         geometries.forEach((geom: any, i: number) => {
             outputChannel.appendLine(`  [${i}] type: ${typeof geom}, keys: ${Object.keys(geom).join(', ')}`);
-            if (geom.polygons) outputChannel.appendLine(`      polygons: ${geom.polygons.length}`);
-            if (geom.sides) outputChannel.appendLine(`      sides: ${geom.sides}`);
+            if (geom.polygons) {
+                outputChannel.appendLine(`      polygons: ${geom.polygons.length}`);
+            }
+            if (geom.sides) {
+                outputChannel.appendLine(`      sides: ${geom.sides}`);
+            }
         });
         
         // Convert geometries to renderer entities
