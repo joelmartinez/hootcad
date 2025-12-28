@@ -72,8 +72,13 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 
 	outputChannel.appendLine(`Resolved entrypoint: ${entrypoint.filePath} (source: ${entrypoint.source})`);
 
+	// Extract filename for the title
+	const fileName = entrypoint.filePath.split(/[/\\]/).pop() || 'preview';
+	const title = `🦉 ${fileName}`;
+
 	// If panel already exists, reveal it
 	if (currentPanel) {
+		currentPanel.title = title;
 		currentPanel.reveal(vscode.ViewColumn.Two);
 		// Re-execute and render
 		await executeAndRender(entrypoint.filePath);
@@ -83,7 +88,7 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 	// Create new webview panel
 	currentPanel = vscode.window.createWebviewPanel(
 		'hootcadPreview',
-		'HootCAD Preview',
+		title,
 		vscode.ViewColumn.Two,
 		{
 			enableScripts: true,
