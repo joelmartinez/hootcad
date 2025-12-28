@@ -433,12 +433,11 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				}
 				
 				// Render the scene with grid and axes for debugging
+				// Note: Grid and axes are rendered first to match official @jscad/regl-renderer demo pattern
 				renderer.render({
 					camera: renderer.camera,
 					drawCommands: renderer.drawCommands,
 					entities: [
-						// User entities first (avoid helper state leaking into mesh draws)
-						...currentEntities,
 						// Grid for reference
 						{
 							visuals: { drawCmd: 'drawGrid', show: true },
@@ -449,7 +448,9 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 						{
 							visuals: { drawCmd: 'drawAxis', show: true },
 							size: 50
-						}
+						},
+						// User entities last
+						...currentEntities
 					]
 				});
 				
