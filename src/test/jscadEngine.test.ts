@@ -2,10 +2,12 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { resolveJscadEntrypoint, executeJscadFile } from '../jscadEngine';
+import { resolveJscadEntrypoint, resolveJscadEntrypointWithOptions, executeJscadFile } from '../jscadEngine';
 
 suite('JSCAD Engine Test Suite', () => {
-	const fixturesPath = path.join(__dirname, 'fixtures');
+	// Tests run from compiled output in CI (out/test/**). Fixtures live in src/test/fixtures.
+	// Resolve to repo-root/src/test/fixtures regardless of whether __dirname is src/test or out/test.
+	const fixturesPath = path.resolve(__dirname, '../../src/test/fixtures');
 	
 	// Create a proper mock OutputChannel
 	const createMockOutputChannel = (captureLog: boolean = false, logs?: string[]): vscode.OutputChannel => {
@@ -138,14 +140,8 @@ module.exports = { main }
 					jscadContent
 				);
 				
-				// Open workspace
-				const workspaceUri = vscode.Uri.file(testDir);
-				await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, false);
-				
-				// Give VS Code time to load workspace
-				await new Promise(resolve => setTimeout(resolve, 500));
-				
-				const entrypoint = resolveJscadEntrypoint();
+				// Avoid vscode.openFolder in tests: it reloads the window and can cancel the extension host in CI.
+				const entrypoint = resolveJscadEntrypointWithOptions({ workspaceRoot: testDir });
 				
 				assert.ok(entrypoint, 'Should resolve an entrypoint');
 				assert.strictEqual(entrypoint.source, 'package.json', 'Should resolve from package.json');
@@ -189,11 +185,7 @@ module.exports = { main }
 					jscadContent
 				);
 				
-				const workspaceUri = vscode.Uri.file(testDir);
-				await vscode.commands.executeCommand('vscode.openFolder', workspaceUri, false);
-				await new Promise(resolve => setTimeout(resolve, 500));
-				
-				const entrypoint = resolveJscadEntrypoint();
+				const entrypoint = resolveJscadEntrypointWithOptions({ workspaceRoot: testDir });
 				
 				assert.ok(entrypoint, 'Should resolve an entrypoint');
 				assert.strictEqual(entrypoint.source, 'index.jscad', 'Should resolve from index.jscad');

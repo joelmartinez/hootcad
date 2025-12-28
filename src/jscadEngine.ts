@@ -8,6 +8,20 @@ export interface JscadEntrypoint {
     source: 'package.json' | 'index.jscad' | 'active-editor';
 }
 
+export interface ResolveJscadEntrypointOptions {
+    /**
+     * Overrides the workspace root folder for entrypoint resolution.
+     * When omitted, uses VS Code's current workspace.
+     */
+    workspaceRoot?: string;
+
+    /**
+     * Overrides the active editor file path used for the final fallback.
+     * When omitted, uses VS Code's active editor.
+     */
+    activeEditorFilePath?: string | null;
+}
+
 /**
  * Resolves the JSCAD entrypoint using the following priority:
  * 1. Workspace package.json "main" field (if it's a .jscad file)
@@ -16,14 +30,18 @@ export interface JscadEntrypoint {
  * 4. Error if none found
  */
 export function resolveJscadEntrypoint(): JscadEntrypoint | null {
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    
-    if (!workspaceFolders || workspaceFolders.length === 0) {
-        // No workspace, try active editor
-        return resolveFromActiveEditor();
-    }
+    return resolveJscadEntrypointWithOptions({});
+}
 
-    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+/**
+ * Internal implementation with injectable inputs for testing.
+ */
+export function resolveJscadEntrypointWithOptions(options: ResolveJscadEntrypointOptions): JscadEntrypoint | null {
+    const workspaceRoot = options.workspaceRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceRoot) {
+        // No workspace, try active editor
+        return resolveFromActiveEditor(options.activeEditorFilePath);
+    }
 
     // 1. Check package.json main field
     const packageJsonPath = path.join(workspaceRoot, 'package.json');
@@ -54,14 +72,14 @@ export function resolveJscadEntrypoint(): JscadEntrypoint | null {
     }
 
     // 3. Fallback to active editor
-    return resolveFromActiveEditor();
+    return resolveFromActiveEditor(options.activeEditorFilePath);
 }
 
-function resolveFromActiveEditor(): JscadEntrypoint | null {
-    const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor && activeEditor.document.fileName.endsWith('.jscad')) {
+function resolveFromActiveEditor(activeEditorFilePath?: string | null): JscadEntrypoint | null {
+    const editorFilePath = activeEditorFilePath ?? vscode.window.activeTextEditor?.document.fileName;
+    if (editorFilePath && editorFilePath.endsWith('.jscad')) {
         return {
-            filePath: activeEditor.document.fileName,
+            filePath: editorFilePath,
             source: 'active-editor'
         };
     }
