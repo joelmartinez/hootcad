@@ -1,9 +1,11 @@
 import * as vscode from 'vscode';
-import { resolveJscadEntrypoint, executeJscadFile } from './jscadEngine';
+import { resolveJscadEntrypoint, executeJscadFile, getParameterDefinitions, ParameterDefinition } from './jscadEngine';
+import { ParameterCache } from './parameterCache';
 
 let outputChannel: vscode.OutputChannel;
 let currentPanel: vscode.WebviewPanel | undefined;
 let statusBarItem: vscode.StatusBarItem;
+let parameterCache: ParameterCache;
 
 /**
  * Extracts the filename from a file path, handling both Unix and Windows path separators.
@@ -30,6 +32,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(outputChannel);
 	
 	outputChannel.appendLine('HootCAD extension activated');
+
+	// Initialize parameter cache
+	parameterCache = new ParameterCache(context);
 
 	// Create status bar item
 	statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -133,6 +138,13 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 					// Execute and render the JSCAD file
 					await executeAndRender(entrypoint.filePath);
 					return;
+				case 'parameterChanged':
+					outputChannel.appendLine(`Parameter changed: ${message.name} = ${message.value}`);
+					// Update cache
+					parameterCache.updateParameter(message.filePath, message.name, message.value);
+					// Re-render with new parameters
+					await executeAndRender(message.filePath);
+					return;
 			}
 		},
 		undefined,
@@ -157,12 +169,25 @@ async function executeAndRender(filePath: string) {
 		outputChannel.appendLine(`Executing JSCAD file: ${filePath}`);
 		statusBarItem.text = "HootCAD: Executing...";
 
-		const entities = await executeJscadFile(filePath, outputChannel);
+		// Get parameter definitions
+		const definitions = await getParameterDefinitions(filePath, outputChannel);
+		
+		// Get merged parameters (defaults + cached values)
+		const params = parameterCache.getMergedParameters(filePath, definitions);
+
+		// Execute with parameters
+		const entities = await executeJscadFile(filePath, outputChannel, params);
 
 		if (currentPanel) {
+			// Send both entities and parameter UI data to webview
 			currentPanel.webview.postMessage({
 				type: 'renderEntities',
-				entities: entities
+				entities: entities,
+				parameters: {
+					definitions: definitions,
+					values: params,
+					filePath: filePath
+				}
 			});
 			outputChannel.appendLine('Render entities sent to webview');
 			statusBarItem.text = "HootCAD: Rendered";
@@ -268,6 +293,98 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			transform: translate(-50%, -50%);
 			color: var(--vscode-foreground);
 		}
+		#parameter-panel {
+			position: absolute;
+			top: 20px;
+			right: 20px;
+			background-color: rgba(30, 30, 30, 0.95);
+			border: 1px solid var(--vscode-panel-border);
+			border-radius: 6px;
+			min-width: 250px;
+			max-width: 400px;
+			max-height: calc(100vh - 200px);
+			display: none;
+			flex-direction: column;
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+			backdrop-filter: blur(10px);
+		}
+		#parameter-panel.visible {
+			display: flex;
+		}
+		#parameter-header {
+			padding: 12px 16px;
+			border-bottom: 1px solid var(--vscode-panel-border);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			cursor: pointer;
+			user-select: none;
+		}
+		#parameter-header:hover {
+			background-color: rgba(255, 255, 255, 0.05);
+		}
+		#parameter-title {
+			font-size: 14px;
+			font-weight: 600;
+			color: var(--vscode-foreground);
+		}
+		#collapse-button {
+			background: none;
+			border: none;
+			color: var(--vscode-foreground);
+			cursor: pointer;
+			font-size: 16px;
+			padding: 0;
+			width: 20px;
+			text-align: center;
+		}
+		#parameter-content {
+			overflow-y: auto;
+			padding: 16px;
+		}
+		#parameter-content.collapsed {
+			display: none;
+		}
+		.parameter-item {
+			margin-bottom: 16px;
+		}
+		.parameter-label {
+			display: block;
+			margin-bottom: 6px;
+			font-size: 12px;
+			color: var(--vscode-descriptionForeground);
+		}
+		.parameter-input {
+			width: 100%;
+			padding: 6px 8px;
+			background-color: var(--vscode-input-background);
+			border: 1px solid var(--vscode-input-border);
+			color: var(--vscode-input-foreground);
+			border-radius: 3px;
+			font-size: 13px;
+			font-family: var(--vscode-font-family);
+		}
+		.parameter-input:focus {
+			outline: none;
+			border-color: var(--vscode-focusBorder);
+		}
+		.parameter-checkbox {
+			width: auto;
+			margin-right: 8px;
+		}
+		.parameter-checkbox-label {
+			display: flex;
+			align-items: center;
+			cursor: pointer;
+		}
+		.parameter-slider {
+			width: 100%;
+		}
+		.parameter-value {
+			font-size: 11px;
+			color: var(--vscode-descriptionForeground);
+			margin-top: 4px;
+		}
 	</style>
 	<script src="${rendererUri}"></script>
 </head>
@@ -280,6 +397,13 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			<canvas id="renderCanvas"></canvas>
 			<div id="loading" class="loading">Loading...</div>
 			<div id="error-message"></div>
+			<div id="parameter-panel">
+				<div id="parameter-header">
+					<div id="parameter-title">Parameters</div>
+					<button id="collapse-button" title="Collapse/Expand">▼</button>
+				</div>
+				<div id="parameter-content"></div>
+			</div>
 		</div>
 		<div id="status">Status: Initializing...</div>
 	</div>
@@ -754,6 +878,10 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				case 'renderEntities':
 					if (message.entities && message.entities.length > 0) {
 						renderEntities(message.entities);
+						// Update parameter panel if parameters are provided
+						if (message.parameters) {
+							updateParameterPanel(message.parameters);
+						}
 					} else {
 						showError('No entity data received');
 					}
@@ -763,6 +891,165 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					break;
 			}
 		});
+
+		// Parameter panel management
+		const parameterPanel = document.getElementById('parameter-panel');
+		const parameterContent = document.getElementById('parameter-content');
+		const parameterHeader = document.getElementById('parameter-header');
+		const collapseButton = document.getElementById('collapse-button');
+		let isCollapsed = false;
+		let currentFilePath = '';
+
+		// Toggle collapse
+		parameterHeader.addEventListener('click', () => {
+			isCollapsed = !isCollapsed;
+			parameterContent.classList.toggle('collapsed', isCollapsed);
+			collapseButton.textContent = isCollapsed ? '▶' : '▼';
+		});
+
+		function updateParameterPanel(parameters) {
+			const { definitions, values, filePath } = parameters;
+			currentFilePath = filePath;
+			
+			if (!definitions || definitions.length === 0) {
+				parameterPanel.classList.remove('visible');
+				return;
+			}
+
+			// Clear existing content
+			parameterContent.innerHTML = '';
+
+			// Create inputs for each parameter
+			definitions.forEach(def => {
+				const paramDiv = document.createElement('div');
+				paramDiv.className = 'parameter-item';
+
+				const label = document.createElement('label');
+				label.className = 'parameter-label';
+				label.textContent = def.caption || def.name;
+
+				let input;
+				const currentValue = values[def.name];
+
+				if (def.type === 'checkbox') {
+					const checkboxLabel = document.createElement('label');
+					checkboxLabel.className = 'parameter-checkbox-label';
+					
+					input = document.createElement('input');
+					input.type = 'checkbox';
+					input.className = 'parameter-input parameter-checkbox';
+					input.checked = currentValue;
+					input.addEventListener('change', () => {
+						sendParameterChange(def.name, input.checked);
+					});
+					
+					checkboxLabel.appendChild(input);
+					checkboxLabel.appendChild(document.createTextNode(def.caption || def.name));
+					paramDiv.appendChild(checkboxLabel);
+				} else if (def.type === 'choice') {
+					paramDiv.appendChild(label);
+					
+					input = document.createElement('select');
+					input.className = 'parameter-input';
+					
+					(def.values || []).forEach((value, index) => {
+						const option = document.createElement('option');
+						option.value = value;
+						option.textContent = (def.captions && def.captions[index]) || value;
+						if (value === currentValue) {
+							option.selected = true;
+						}
+						input.appendChild(option);
+					});
+					
+					input.addEventListener('change', () => {
+						sendParameterChange(def.name, input.value);
+					});
+					
+					paramDiv.appendChild(input);
+				} else if (def.type === 'slider' || (def.type === 'number' && def.min !== undefined && def.max !== undefined)) {
+					paramDiv.appendChild(label);
+					
+					input = document.createElement('input');
+					input.type = 'range';
+					input.className = 'parameter-input parameter-slider';
+					input.min = def.min !== undefined ? def.min : 0;
+					input.max = def.max !== undefined ? def.max : 100;
+					input.step = def.step !== undefined ? def.step : 1;
+					input.value = currentValue;
+					
+					const valueDisplay = document.createElement('div');
+					valueDisplay.className = 'parameter-value';
+					valueDisplay.textContent = 'Value: ' + currentValue;
+					
+					input.addEventListener('input', () => {
+						valueDisplay.textContent = 'Value: ' + input.value;
+					});
+					
+					input.addEventListener('change', () => {
+						const value = def.type === 'int' ? parseInt(input.value) : parseFloat(input.value);
+						sendParameterChange(def.name, value);
+					});
+					
+					paramDiv.appendChild(input);
+					paramDiv.appendChild(valueDisplay);
+				} else {
+					// Default to text input for number, text, etc.
+					paramDiv.appendChild(label);
+					
+					input = document.createElement('input');
+					input.className = 'parameter-input';
+					
+					if (def.type === 'number' || def.type === 'int') {
+						input.type = 'number';
+						if (def.min !== undefined) input.min = def.min;
+						if (def.max !== undefined) input.max = def.max;
+						if (def.step !== undefined) input.step = def.step;
+					} else if (def.type === 'color') {
+						input.type = 'color';
+					} else if (def.type === 'date') {
+						input.type = 'date';
+					} else if (def.type === 'email') {
+						input.type = 'email';
+					} else if (def.type === 'password') {
+						input.type = 'password';
+					} else if (def.type === 'url') {
+						input.type = 'url';
+					} else {
+						input.type = 'text';
+					}
+					
+					input.value = currentValue;
+					
+					input.addEventListener('change', () => {
+						let value = input.value;
+						if (def.type === 'number') {
+							value = parseFloat(value);
+						} else if (def.type === 'int') {
+							value = parseInt(value);
+						}
+						sendParameterChange(def.name, value);
+					});
+					
+					paramDiv.appendChild(input);
+				}
+
+				parameterContent.appendChild(paramDiv);
+			});
+
+			// Show the panel
+			parameterPanel.classList.add('visible');
+		}
+
+		function sendParameterChange(name, value) {
+			console.log('Parameter changed:', name, value);
+			vscode.postMessage({
+				type: 'parameterChanged',
+				name: name,
+				value: value,
+				filePath: currentFilePath
+			});
+		}
 
 		// Initialize renderer and notify extension we're ready
 		if (typeof jscadReglRenderer !== 'undefined') {
