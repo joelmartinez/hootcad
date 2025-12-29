@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { resolveJscadEntrypoint, executeJscadFile, getParameterDefinitions, ParameterDefinition } from './jscadEngine';
+import { resolveJscadEntrypoint, executeJscadFile, getParameterDefinitions } from './jscadEngine';
 import { ParameterCache } from './parameterCache';
 
 let outputChannel: vscode.OutputChannel;
@@ -969,16 +969,20 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					
 					(def.values || []).forEach((value, index) => {
 						const option = document.createElement('option');
-						option.value = value;
-						option.textContent = (def.captions && def.captions[index]) || value;
-						if (value === currentValue) {
+						option.value = String(value);
+						option.textContent = (def.captions && def.captions[index]) || String(value);
+						if (currentValue !== undefined && String(value) === String(currentValue)) {
 							option.selected = true;
 						}
 						input.appendChild(option);
 					});
 					
 					input.addEventListener('change', () => {
-						sendParameterChange(def.name, input.value);
+						const selectElement = input as HTMLSelectElement;
+						const selectedIndex = selectElement.selectedIndex;
+						const valuesArray = def.values || [];
+						const selectedValue = valuesArray[selectedIndex];
+						sendParameterChange(def.name, selectedValue !== undefined ? selectedValue : selectElement.value);
 					});
 					
 					paramDiv.appendChild(input);
@@ -1034,16 +1038,27 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 						input.type = 'text';
 					}
 					
-					input.value = currentValue;
+					// Ensure int values are displayed as integers
+					input.value = def.type === 'int' && typeof currentValue === 'number' 
+						? String(Math.floor(currentValue))
+						: String(currentValue);
 					
 					input.addEventListener('change', () => {
 						let value = input.value;
 						if (def.type === 'number') {
 							const parsed = parseFloat(value);
-							value = isNaN(parsed) ? (def.initial ?? 0) : parsed;
+							value = isNaN(parsed)
+								? (def.initial !== undefined
+									? def.initial
+									: (def.min !== undefined ? def.min : undefined))
+								: parsed;
 						} else if (def.type === 'int') {
 							const parsed = parseInt(value);
-							value = isNaN(parsed) ? (def.initial ?? 0) : parsed;
+							value = isNaN(parsed)
+								? (def.initial !== undefined
+									? def.initial
+									: (def.min !== undefined ? def.min : undefined))
+								: parsed;
 						}
 						sendParameterChange(def.name, value);
 					});
