@@ -233,6 +233,12 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>HootCAD Preview</title>
 	<style>
+		:root {
+			/* Theme-aware translucent overlay colors */
+			--hoot-param-panel-bg: color-mix(in srgb, var(--vscode-editorWidget-background) 88%, transparent);
+			--hoot-param-panel-hover-bg: color-mix(in srgb, var(--vscode-list-hoverBackground) 70%, transparent);
+			--hoot-param-muted-fg: color-mix(in srgb, var(--vscode-foreground) 50%, transparent);
+		}
 		body {
 			margin: 0;
 			padding: 0;
@@ -297,7 +303,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			position: absolute;
 			top: 20px;
 			right: 20px;
-			background-color: rgba(30, 30, 30, 0.95);
+			background-color: var(--hoot-param-panel-bg);
 			border: 1px solid var(--vscode-panel-border);
 			border-radius: 6px;
 			min-width: 250px;
@@ -305,8 +311,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			max-height: calc(100vh - 200px);
 			display: none;
 			flex-direction: column;
-			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-			backdrop-filter: blur(10px);
+			box-shadow: 0 4px 12px var(--vscode-widget-shadow);
+			backdrop-filter: blur(4px);
 		}
 		#parameter-panel.visible {
 			display: flex;
@@ -321,7 +327,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			user-select: none;
 		}
 		#parameter-header:hover {
-			background-color: rgba(255, 255, 255, 0.05);
+			background-color: var(--hoot-param-panel-hover-bg);
 		}
 		#parameter-title {
 			font-size: 14px;
@@ -352,7 +358,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			display: block;
 			margin-bottom: 6px;
 			font-size: 12px;
-			color: var(--vscode-descriptionForeground);
+			color: var(--hoot-param-muted-fg);
+			font-weight: 500;
 		}
 		.parameter-input {
 			width: 100%;
@@ -382,7 +389,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		}
 		.parameter-value {
 			font-size: 11px;
-			color: var(--vscode-descriptionForeground);
+			color: var(--hoot-param-muted-fg);
 			margin-top: 4px;
 		}
 	</style>
