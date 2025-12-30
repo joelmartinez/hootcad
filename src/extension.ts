@@ -457,6 +457,14 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		let renderer = null;
 		let currentEntities = [];
 
+		function clearError() {
+			if (!errorElement) {
+				return;
+			}
+			errorElement.textContent = '';
+			errorElement.style.display = 'none';
+		}
+
 		function resizeCanvasToDisplaySize() {
 			const container = canvas.parentElement;
 			const dpr = window.devicePixelRatio || 1;
@@ -533,6 +541,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				// Set up mouse controls
 				setupMouseControls();
 				
+				clearError();
 				statusElement.textContent = 'Status: Renderer initialized';
 				return true;
 			} catch (error) {
@@ -669,6 +678,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			}
 
 			try {
+				// Any successful render should clear previous error overlays.
+				clearError();
 				// Convert arrays back to typed arrays for rendering
 				// NOTE: @jscad/regl-renderer drawMesh forces element type to uint16.
 				// Passing a Uint32Array here will corrupt indices (bytes interpreted as uint16),
