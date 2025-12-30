@@ -978,11 +978,10 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					});
 					
 					input.addEventListener('change', () => {
-						const selectElement = input as HTMLSelectElement;
-						const selectedIndex = selectElement.selectedIndex;
+						const selectedIndex = input.selectedIndex;
 						const valuesArray = def.values || [];
 						const selectedValue = valuesArray[selectedIndex];
-						sendParameterChange(def.name, selectedValue !== undefined ? selectedValue : selectElement.value);
+						sendParameterChange(def.name, selectedValue !== undefined ? selectedValue : input.value);
 					});
 					
 					paramDiv.appendChild(input);
