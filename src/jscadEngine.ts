@@ -2,6 +2,61 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { createRequire } from 'module';
+import * as vm from 'vm';
+
+function getErrorMessage(error: unknown): string {
+    if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+        return (error as any).message;
+    }
+    return String(error);
+}
+
+function getErrorStack(error: unknown): string | undefined {
+    if (error && typeof error === 'object' && 'stack' in error && typeof (error as any).stack === 'string') {
+        return (error as any).stack;
+    }
+    return undefined;
+}
+
+function loadJscadModuleFromFile(filePath: string, outputChannel: vscode.OutputChannel): any {
+    // Use eval to get the real Node.js require (bypasses webpack)
+    const nodeRequire = eval('require');
+
+    // Create a require function from the extension's context so it can find @jscad modules
+    const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
+
+    // Read the file content
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+
+    // Create a custom require that tries both the file's directory and extension's node_modules
+    const customRequire = (moduleName: string) => {
+        try {
+            // First try to require from the file's directory / Node resolution
+            return nodeRequire(moduleName);
+        } catch (e) {
+            // Fallback to extension's node_modules
+            return extensionRequire(moduleName);
+        }
+    };
+
+    const module = { exports: {} as any };
+    const dirname = path.dirname(filePath);
+
+    // Execute the JSCAD file in a VM context with filename so stack traces show real locations.
+    const context = vm.createContext({
+        require: customRequire,
+        module,
+        exports: module.exports,
+        __filename: filePath,
+        __dirname: dirname,
+        console
+    });
+
+    const script = new vm.Script(fileContent, { filename: filePath });
+    script.runInContext(context);
+
+    return module.exports;
+}
 
 export interface JscadEntrypoint {
     filePath: string;
@@ -106,35 +161,10 @@ function resolveFromActiveEditor(activeEditorFilePath?: string | null): JscadEnt
  * Gets parameter definitions from a JSCAD file
  */
 export async function getParameterDefinitions(filePath: string, outputChannel: vscode.OutputChannel): Promise<ParameterDefinition[]> {
-    // Use eval to get the real Node.js require (bypasses webpack)
-    const nodeRequire = eval('require');
-    
-    // Create a require function from the extension's context so it can find @jscad modules
-    const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
-    
     try {
         outputChannel.appendLine(`Getting parameter definitions from: ${filePath}`);
 
-        // Read the file content
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        
-        // Create a custom require that tries both the file's directory and extension's node_modules
-        const customRequire = (moduleName: string) => {
-            try {
-                // First try to require from the file's directory
-                return nodeRequire(moduleName);
-            } catch (e) {
-                // Fallback to extension's node_modules
-                return extensionRequire(moduleName);
-            }
-        };
-        
-        // Execute the JSCAD file in a custom context
-        const module = { exports: {} };
-        const wrapper = new Function('require', 'module', 'exports', '__filename', '__dirname', fileContent);
-        wrapper(customRequire, module, module.exports, filePath, path.dirname(filePath));
-        
-        const jscadModule = module.exports as any;
+        const jscadModule = loadJscadModuleFromFile(filePath, outputChannel) as any;
 
         // Check if getParameterDefinitions function exists
         if (jscadModule.getParameterDefinitions && typeof jscadModule.getParameterDefinitions === 'function') {
@@ -147,7 +177,7 @@ export async function getParameterDefinitions(filePath: string, outputChannel: v
         outputChannel.appendLine('No parameter definitions found');
         return [];
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = getErrorMessage(error);
         outputChannel.appendLine(`Error getting parameter definitions: ${errorMessage}`);
         // Return empty array on error
         return [];
@@ -158,35 +188,13 @@ export async function getParameterDefinitions(filePath: string, outputChannel: v
  * Executes a JSCAD file and returns renderer-ready entities
  */
 export async function executeJscadFile(filePath: string, outputChannel: vscode.OutputChannel, params?: Record<string, any>): Promise<any[]> {
-    // Use eval to get the real Node.js require (bypasses webpack)
-    const nodeRequire = eval('require');
-    
     // Create a require function from the extension's context so it can find @jscad modules
     const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
     
     try {
         outputChannel.appendLine(`Executing JSCAD file: ${filePath}`);
 
-        // Read the file content
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        
-        // Create a custom require that tries both the file's directory and extension's node_modules
-        const customRequire = (moduleName: string) => {
-            try {
-                // First try to require from the file's directory
-                return nodeRequire(moduleName);
-            } catch (e) {
-                // Fallback to extension's node_modules
-                return extensionRequire(moduleName);
-            }
-        };
-        
-        // Execute the JSCAD file in a custom context
-        const module = { exports: {} };
-        const wrapper = new Function('require', 'module', 'exports', '__filename', '__dirname', fileContent);
-        wrapper(customRequire, module, module.exports, filePath, path.dirname(filePath));
-        
-        const jscadModule = module.exports as any;
+        const jscadModule = loadJscadModuleFromFile(filePath, outputChannel) as any;
 
         // Check if main function exists
         if (!jscadModule.main || typeof jscadModule.main !== 'function') {
@@ -269,10 +277,11 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
         
         return serializedEntities;
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage = getErrorMessage(error);
         outputChannel.appendLine(`Error executing JSCAD file: ${errorMessage}`);
-        if (error instanceof Error && error.stack) {
-            outputChannel.appendLine(error.stack);
+        const stack = getErrorStack(error);
+        if (stack) {
+            outputChannel.appendLine(stack);
         }
         throw error;
     }

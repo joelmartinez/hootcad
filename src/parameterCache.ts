@@ -46,9 +46,50 @@ export class ParameterCache {
         const cached = this.cache.get(filePath) || {};
         const merged: Record<string, any> = {};
 
+        const coerceColor = (value: any): any => {
+            // Accept arrays already in [r,g,b] or [r,g,b,a]
+            if (Array.isArray(value)) {
+                const numeric = value.map((v: any) => Number(v));
+                if (numeric.every((v: number) => Number.isFinite(v)) && (numeric.length === 3 || numeric.length === 4)) {
+                    const needsNormalize = numeric.some((v: number) => v > 1);
+                    const normalized = needsNormalize ? numeric.map((v: number) => v / 255) : numeric;
+                    const rgba = normalized.length === 3 ? [...normalized, 1] : normalized;
+                    return rgba;
+                }
+                return value;
+            }
+
+            if (typeof value !== 'string') {
+                return value;
+            }
+
+            const hex = value.trim();
+            const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(hex);
+            if (!match) {
+                return value;
+            }
+
+            let digits = match[1];
+            // Expand shorthand forms (#rgb, #rgba)
+            if (digits.length === 3 || digits.length === 4) {
+                digits = digits.split('').map(ch => ch + ch).join('');
+            }
+
+            const r = parseInt(digits.slice(0, 2), 16);
+            const g = parseInt(digits.slice(2, 4), 16);
+            const b = parseInt(digits.slice(4, 6), 16);
+            const a = digits.length === 8 ? parseInt(digits.slice(6, 8), 16) : 255;
+
+            return [r / 255, g / 255, b / 255, a / 255];
+        };
+
         const coerceValue = (def: ParameterDefinition, value: any): any => {
             if (value === undefined) {
                 return value;
+            }
+
+            if (def.type === 'color') {
+                return coerceColor(value);
             }
 
             if (def.type === 'checkbox') {
@@ -90,12 +131,12 @@ export class ParameterCache {
             if (def.type === 'checkbox') {
                 merged[def.name] = def.checked ?? false;
             } else if (def.type === 'choice' && def.initial !== undefined) {
-                merged[def.name] = def.initial;
+                merged[def.name] = coerceValue(def, def.initial);
             } else if (def.type === 'choice' && def.values && def.values.length > 0) {
                 // Use first value as default when no initial value specified
-                merged[def.name] = def.values[0];
+                merged[def.name] = coerceValue(def, def.values[0]);
             } else if (def.initial !== undefined) {
-                merged[def.name] = def.initial;
+                merged[def.name] = coerceValue(def, def.initial);
             }
         }
 

@@ -153,4 +153,31 @@ suite('Parameter Cache Test Suite', () => {
         
         assert.strictEqual(retrieved, undefined, 'Should return undefined for uncached file');
     });
+
+    test('Should coerce color hex strings to RGBA arrays', () => {
+        const filePath = '/test/color-file.jscad';
+        const definitions: ParameterDefinition[] = [
+            { name: 'sphereColor', type: 'color', initial: '#ff5555' }
+        ];
+
+        const merged = cache.getMergedParameters(filePath, definitions);
+        assert.ok(Array.isArray(merged.sphereColor), 'Color should be an array');
+        assert.strictEqual(merged.sphereColor.length, 4, 'Color should be RGBA');
+        // #ff5555 -> (255,85,85,255)
+        assert.ok(Math.abs(merged.sphereColor[0] - 1) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[1] - (85 / 255)) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[2] - (85 / 255)) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[3] - 1) < 1e-9);
+    });
+
+    test('Should coerce cached color hex overrides', () => {
+        const filePath = '/test/color-file-2.jscad';
+        const definitions: ParameterDefinition[] = [
+            { name: 'sphereColor', type: 'color', initial: '#000000' }
+        ];
+        cache.set(filePath, { sphereColor: '#00ff00' });
+
+        const merged = cache.getMergedParameters(filePath, definitions);
+        assert.deepStrictEqual(merged.sphereColor, [0, 1, 0, 1]);
+    });
 });

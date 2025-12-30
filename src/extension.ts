@@ -165,6 +165,7 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 }
 
 async function executeAndRender(filePath: string) {
+	let lastParams: Record<string, any> | undefined;
 	try {
 		outputChannel.appendLine(`Executing JSCAD file: ${filePath}`);
 		statusBarItem.text = "HootCAD: Executing...";
@@ -174,6 +175,7 @@ async function executeAndRender(filePath: string) {
 		
 		// Get merged parameters (defaults + cached values)
 		const params = parameterCache.getMergedParameters(filePath, definitions);
+		lastParams = params;
 
 		// Execute with parameters
 		const entities = await executeJscadFile(filePath, outputChannel, params);
@@ -198,9 +200,39 @@ async function executeAndRender(filePath: string) {
 			}, 3000);
 		}
 	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
+		const errorMsg = (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string')
+			? (error as any).message
+			: String(error);
 		outputChannel.appendLine(`Execution failed: ${errorMsg}`);
-		vscode.window.showErrorMessage(`JSCAD execution failed: ${errorMsg}`);
+
+		// Best-effort parameter snapshot to help users troubleshoot.
+		try {
+			const snapshotParams = lastParams;
+			if (!snapshotParams) {
+				throw new Error('No parameter snapshot available');
+			}
+			const snapshot = JSON.stringify(snapshotParams, Object.keys(snapshotParams).sort(), 2);
+			// Avoid flooding the output.
+			const maxLen = 10_000;
+			outputChannel.appendLine('Parameter snapshot:');
+			outputChannel.appendLine(snapshot.length > maxLen ? snapshot.slice(0, maxLen) + '\n… (truncated)' : snapshot);
+		} catch (e) {
+			outputChannel.appendLine('Parameter snapshot: <unavailable>');
+		}
+
+		// Source location reporting from stack trace, when available.
+		const stack = (error && typeof error === 'object' && 'stack' in error && typeof (error as any).stack === 'string')
+			? (error as any).stack
+			: undefined;
+		if (stack) {
+			const escaped = filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			const match = stack.match(new RegExp(`${escaped}:(\\d+):(\\d+)`));
+			if (match) {
+				outputChannel.appendLine(`Source location: ${filePath}:${match[1]}:${match[2]}`);
+			}
+		}
+
+		vscode.window.showErrorMessage(`JSCAD execution failed: ${errorMsg} (see Output → HootCAD for details)`);
 		statusBarItem.text = "HootCAD: Error";
 		
 		if (currentPanel) {

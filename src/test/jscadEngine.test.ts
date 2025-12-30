@@ -257,6 +257,22 @@ module.exports = { main }
 			);
 		});
 
+		test('executeJscadFile error stack includes .jscad source location', async () => {
+			const filePath = path.join(fixturesPath, 'runtime-error.jscad');
+			try {
+				await executeJscadFile(filePath, mockOutputChannel);
+				assert.fail('Expected executeJscadFile to throw');
+			} catch (err) {
+				assert.ok(err && typeof err === 'object', 'Should throw an error-like object');
+				const stack = (err as any).stack;
+				assert.ok(typeof stack === 'string' && stack.length > 0, 'Error should include a stack trace');
+				assert.ok(
+					stack.includes(filePath),
+					`Stack trace should include the source file path (${filePath})`
+				);
+			}
+		});
+
 		test('executeJscadFile clears require cache for fresh execution', async () => {
 			const filePath = path.join(fixturesPath, 'valid-cube.jscad');
 			
@@ -309,8 +325,9 @@ module.exports = { main }
 				await executeJscadFile(filePath, mockOutputChannel);
 				assert.fail('Should have thrown an error');
 			} catch (error) {
-				assert.ok(error instanceof Error, 'Should throw Error instance');
-				assert.ok(error.message.includes('Intentional runtime error'), 'Should include error message');
+				assert.ok(error && typeof error === 'object', 'Should throw error-like object');
+				assert.ok(typeof (error as any).message === 'string', 'Should include error message');
+				assert.ok((error as any).message.includes('Intentional runtime error'), 'Should include error message');
 			}
 		});
 
