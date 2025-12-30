@@ -456,6 +456,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		
 		let renderer = null;
 		let currentEntities = [];
+		// Counter for generating unique cache IDs across renders to prevent buffer reuse
+		let cacheIdCounter = 0;
 
 		function clearError() {
 			if (!errorElement) {
@@ -683,9 +685,6 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				showError('Render error: ' + error.message);
 			}
 		}
-
-		// Counter for generating unique cache IDs across renders
-		let cacheIdCounter = 0;
 
 		function renderEntities(entities) {
 			if (!renderer) {
