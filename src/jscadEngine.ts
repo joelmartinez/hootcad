@@ -24,7 +24,7 @@ export interface ResolveJscadEntrypointOptions {
 
 export interface ParameterDefinition {
     name: string;
-    type: 'number' | 'int' | 'slider' | 'text' | 'checkbox' | 'choice' | 'color' | 'date' | 'email' | 'password' | 'url';
+    type: 'number' | 'float' | 'int' | 'slider' | 'text' | 'checkbox' | 'choice' | 'color' | 'date' | 'email' | 'password' | 'url';
     initial?: any;
     caption?: string;
     // For number/int/slider

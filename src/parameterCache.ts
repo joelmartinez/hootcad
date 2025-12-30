@@ -46,6 +46,45 @@ export class ParameterCache {
         const cached = this.cache.get(filePath) || {};
         const merged: Record<string, any> = {};
 
+        const coerceValue = (def: ParameterDefinition, value: any): any => {
+            if (value === undefined) {
+                return value;
+            }
+
+            if (def.type === 'checkbox') {
+                if (typeof value === 'boolean') {
+                    return value;
+                }
+                if (typeof value === 'string') {
+                    return value.toLowerCase() === 'true';
+                }
+                return Boolean(value);
+            }
+
+            if (def.type === 'int') {
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                    return Math.trunc(value);
+                }
+                const parsed = typeof value === 'string' ? parseInt(value, 10) : Number(value);
+                return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined;
+            }
+
+            if (def.type === 'number' || def.type === 'float' || def.type === 'slider') {
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                    return value;
+                }
+                const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
+                return Number.isFinite(parsed) ? parsed : undefined;
+            }
+
+            if (def.type === 'choice' && Array.isArray(def.values)) {
+                const match = def.values.find(v => String(v) === String(value));
+                return match !== undefined ? match : value;
+            }
+
+            return value;
+        };
+
         // Start with default values from definitions
         for (const def of definitions) {
             if (def.type === 'checkbox') {
@@ -60,8 +99,15 @@ export class ParameterCache {
             }
         }
 
-        // Override with cached values
-        Object.assign(merged, cached);
+        // Override with cached values (coerced to definition types)
+        for (const def of definitions) {
+            if (Object.prototype.hasOwnProperty.call(cached, def.name)) {
+                const coerced = coerceValue(def, cached[def.name]);
+                if (coerced !== undefined) {
+                    merged[def.name] = coerced;
+                }
+            }
+        }
 
         return merged;
     }

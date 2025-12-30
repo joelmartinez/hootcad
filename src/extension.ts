@@ -919,7 +919,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 
 		// Helper function to determine if parameter should use slider input
 		function shouldUseSlider(def) {
-			return def.type === 'slider' || (def.type === 'number' && def.min !== undefined && def.max !== undefined);
+			return def.type === 'slider' || ((def.type === 'number' || def.type === 'int' || def.type === 'float') && def.min !== undefined && def.max !== undefined);
 		}
 
 		function updateParameterPanel(parameters) {
@@ -1018,11 +1018,15 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					input = document.createElement('input');
 					input.className = 'parameter-input';
 					
-					if (def.type === 'number' || def.type === 'int') {
+					if (def.type === 'number' || def.type === 'int' || def.type === 'float') {
 						input.type = 'number';
 						if (def.min !== undefined) input.min = def.min;
 						if (def.max !== undefined) input.max = def.max;
-						if (def.step !== undefined) input.step = def.step;
+						if (def.step !== undefined) {
+							input.step = def.step;
+						} else {
+							input.step = def.type === 'int' ? '1' : 'any';
+						}
 					} else if (def.type === 'color') {
 						input.type = 'color';
 					} else if (def.type === 'date') {
@@ -1044,7 +1048,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					
 					input.addEventListener('change', () => {
 						let value = input.value;
-						if (def.type === 'number') {
+						if (def.type === 'number' || def.type === 'float') {
 							const parsed = parseFloat(value);
 							value = isNaN(parsed)
 								? (def.initial !== undefined
