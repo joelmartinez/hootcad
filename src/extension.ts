@@ -456,8 +456,9 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		
 		let renderer = null;
 		let currentEntities = [];
-		// Counter for generating unique cache IDs across renders to prevent buffer reuse
-		let cacheIdCounter = 0;
+		// Batch counter increments when new entities are loaded, not on every camera movement.
+		// This allows draw command caching within a batch while preventing buffer reuse across batches.
+		let renderBatchId = 0;
 
 		function clearError() {
 			if (!errorElement) {
@@ -693,6 +694,11 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			}
 
 			try {
+				// Increment batch ID when new entities arrive (parameter change, file reload, etc.)
+				// This ensures entities from different batches get different cacheIds,
+				// preventing buffer reuse across parameter changes.
+				renderBatchId++;
+				
 				// Any successful render should clear previous error overlays.
 				clearError();
 				// Convert arrays back to typed arrays for rendering
@@ -700,15 +706,14 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				// Passing a Uint32Array here will corrupt indices (bytes interpreted as uint16),
 				// producing the "spiky"/random-triangle artifacts we've been seeing.
 				const processedEntities = entities.map((entity, entityIndex) => {
-					// CRITICAL: Assign a unique cacheId for each entity on each render.
+					// CRITICAL: Assign a unique cacheId combining batch ID and entity index.
 					// prepareRender() caches draw commands by visuals.cacheId, and the draw command
-					// captures geometry buffers at creation time. If entities reuse cacheIds across
-					// parameter changes, they will incorrectly reuse old buffers, producing "random"
-					// triangles / white blocks / GL state pollution between entities.
-					// By assigning a new unique cacheId on each render, we ensure each entity gets
-					// fresh draw commands with the correct buffers.
+					// captures geometry buffers at creation time. This scheme:
+					// 1. Within same batch (camera movement): entities reuse same cacheId -> cache hit (fast!)
+					// 2. Across batches (parameter change): entities get new cacheId -> new draw command (correct!)
+					// This prevents GL state pollution where one entity affects another's rendering.
 					const visuals = Object.assign({}, entity.visuals);
-					visuals.cacheId = 'entity_' + cacheIdCounter++;
+					visuals.cacheId = 'batch' + renderBatchId + '_entity' + entityIndex;
 					const processed = {
 						visuals,
 						geometry: {
