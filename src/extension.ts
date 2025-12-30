@@ -633,16 +633,28 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					camera: renderer.camera,
 					drawCommands: renderer.drawCommands,
 					entities: [
-						// Grid for reference
+						// Grid for reference - use fixed cacheId for consistent caching
 						{
-							visuals: { drawCmd: 'drawGrid', show: true },
+							visuals: { drawCmd: 'drawGrid', show: true, cacheId: 'grid' },
 							size: [200, 200],
-							ticks: [10, 1]
+							ticks: [10, 1],
+							// Ensure GL state doesn't pollute user entities
+							extras: {
+								blend: { enable: false },
+								polygonOffset: { enable: false },
+								depth: { enable: true }
+							}
 						},
-						// Axes for orientation
+						// Axes for orientation - use fixed cacheId for consistent caching
 						{
-							visuals: { drawCmd: 'drawAxis', show: true },
-							size: 50
+							visuals: { drawCmd: 'drawAxis', show: true, cacheId: 'axes' },
+							size: 50,
+							// Ensure GL state doesn't pollute user entities
+							extras: {
+								blend: { enable: false },
+								polygonOffset: { enable: false },
+								depth: { enable: true }
+							}
 						},
 						// User entities last
 						...currentEntities
@@ -672,6 +684,9 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			}
 		}
 
+		// Counter for generating unique cache IDs across renders
+		let cacheIdCounter = 0;
+
 		function renderEntities(entities) {
 			if (!renderer) {
 				showError('Renderer not initialized');
@@ -686,12 +701,15 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				// Passing a Uint32Array here will corrupt indices (bytes interpreted as uint16),
 				// producing the "spiky"/random-triangle artifacts we've been seeing.
 				const processedEntities = entities.map((entity, entityIndex) => {
-					// IMPORTANT: drop any incoming cacheId.
+					// CRITICAL: Assign a unique cacheId for each entity on each render.
 					// prepareRender() caches draw commands by visuals.cacheId, and the draw command
-					// captures geometry buffers at creation time. If multiple entities share a cacheId,
-					// they will incorrectly reuse buffers, producing "random" triangles / white blocks.
+					// captures geometry buffers at creation time. If entities reuse cacheIds across
+					// parameter changes, they will incorrectly reuse old buffers, producing "random"
+					// triangles / white blocks / GL state pollution between entities.
+					// By assigning a new unique cacheId on each render, we ensure each entity gets
+					// fresh draw commands with the correct buffers.
 					const visuals = Object.assign({}, entity.visuals);
-					delete visuals.cacheId;
+					visuals.cacheId = 'entity_' + cacheIdCounter++;
 					const processed = {
 						visuals,
 						geometry: {
