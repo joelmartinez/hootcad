@@ -458,6 +458,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		let currentEntities = [];
 		// Batch counter increments when new entities are loaded, not on every camera movement.
 		// This allows draw command caching within a batch while preventing buffer reuse across batches.
+		// Initialized to 0, incremented to 1 on first render.
 		let renderBatchId = 0;
 
 		function clearError() {
