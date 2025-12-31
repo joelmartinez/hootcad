@@ -117,7 +117,7 @@ async function createOrShowPreview(context: vscode.ExtensionContext) {
 			enableScripts: true,
 			retainContextWhenHidden: true,
 			localResourceRoots: [
-				vscode.Uri.joinPath(context.extensionUri, 'node_modules', '@jscad', 'regl-renderer', 'dist')
+				vscode.Uri.joinPath(context.extensionUri, 'node_modules', 'three', 'build')
 			]
 		}
 	);
@@ -245,18 +245,88 @@ async function executeAndRender(filePath: string) {
 }
 
 function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Webview): string {
-	// Get the renderer library path
-	const rendererPath = vscode.Uri.joinPath(
+	// Get Three.js library paths
+	const threePath = vscode.Uri.joinPath(
 		context.extensionUri,
 		'node_modules',
-		'@jscad',
-		'regl-renderer',
-		'dist',
-		'jscad-regl-renderer.min.js'
+		'three',
+		'build',
+		'three.module.js'
 	);
 	
-	// Convert to webview URI
-	const rendererUri = webview.asWebviewUri(rendererPath);
+	const threeUri = webview.asWebviewUri(threePath);
+
+	// Include the converter module inline
+	const converterModule = `
+		// JSCAD to Three.js converter (inline)
+		function triangulatePolygon(vertices) {
+			if (vertices.length < 3) return [];
+			const triangles = [];
+			for (let i = 1; i < vertices.length - 1; i++) {
+				triangles.push([0, i, i + 1]);
+			}
+			return triangles;
+		}
+
+		function convertGeom3ToBufferGeometry(geom3, THREE) {
+			const positions = [];
+			const normals = [];
+			
+			for (const polygon of geom3.polygons) {
+				const vertices = polygon.vertices;
+				if (vertices.length < 3) continue;
+				
+				// Compute face normal
+				const v0 = vertices[0];
+				const v1 = vertices[1];
+				const v2 = vertices[2];
+				
+				const edge1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
+				const edge2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
+				
+				const normal = [
+					edge1[1] * edge2[2] - edge1[2] * edge2[1],
+					edge1[2] * edge2[0] - edge1[0] * edge2[2],
+					edge1[0] * edge2[1] - edge1[1] * edge2[0]
+				];
+				
+				const length = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+				if (length > 0) {
+					normal[0] /= length;
+					normal[1] /= length;
+					normal[2] /= length;
+				}
+				
+				const triangles = triangulatePolygon(vertices);
+				
+				for (const triangle of triangles) {
+					for (const vertexIndex of triangle) {
+						const vertex = vertices[vertexIndex];
+						positions.push(vertex[0], vertex[1], vertex[2]);
+						normals.push(normal[0], normal[1], normal[2]);
+					}
+				}
+			}
+			
+			const geometry = new THREE.BufferGeometry();
+			geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+			geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+			return geometry;
+		}
+
+		function convertGeom2ToLineGeometry(geom2, THREE) {
+			const positions = [];
+			for (const side of geom2.sides) {
+				if (side.length === 2) {
+					positions.push(side[0][0], side[0][1], 0);
+					positions.push(side[1][0], side[1][1], 0);
+				}
+			}
+			const geometry = new THREE.BufferGeometry();
+			geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+			return geometry;
+		}
+	`;
 
 	return `<!DOCTYPE html>
 <html lang="en">
@@ -266,7 +336,6 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 	<title>HootCAD Preview</title>
 	<style>
 		:root {
-			/* Theme-aware translucent overlay colors */
 			--hoot-param-panel-bg: color-mix(in srgb, var(--vscode-editorWidget-background) 88%, transparent);
 			--hoot-param-panel-hover-bg: color-mix(in srgb, var(--vscode-list-hoverBackground) 70%, transparent);
 			--hoot-param-muted-fg: color-mix(in srgb, var(--vscode-foreground) 50%, transparent);
@@ -302,7 +371,6 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			width: 100%;
 			height: 100%;
 			display: block;
-			background-color: #2d2d2d;
 		}
 		#status {
 			padding: 8px 20px;
@@ -425,7 +493,6 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			margin-top: 4px;
 		}
 	</style>
-	<script src="${rendererUri}"></script>
 </head>
 <body>
 	<div id="container">
@@ -447,516 +514,294 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		<div id="status">Status: Initializing...</div>
 	</div>
 
-	<script>
+	<script type="module">
+		${converterModule}
+		
+		import * as THREE from '${threeUri}';
+		
 		const vscode = acquireVsCodeApi();
 		const canvas = document.getElementById('renderCanvas');
 		const statusElement = document.getElementById('status');
 		const loadingElement = document.getElementById('loading');
 		const errorElement = document.getElementById('error-message');
+		const parameterPanel = document.getElementById('parameter-panel');
+		const parameterContent = document.getElementById('parameter-content');
+		const collapseButton = document.getElementById('collapse-button');
 		
-		let renderer = null;
-		let currentEntities = [];
-		// Batch counter increments when new entities are loaded, not on every camera movement.
-		// This allows draw command caching within a batch while preventing buffer reuse across batches.
-		// Initialized to 0, incremented to 1 on first render.
-		let renderBatchId = 0;
-
-		function clearError() {
-			if (!errorElement) {
-				return;
-			}
-			errorElement.textContent = '';
-			errorElement.style.display = 'none';
-		}
-
-		function resizeCanvasToDisplaySize() {
-			const container = canvas.parentElement;
-			const dpr = window.devicePixelRatio || 1;
-			const displayWidth = Math.max(1, Math.floor(container.clientWidth * dpr));
-			const displayHeight = Math.max(1, Math.floor(container.clientHeight * dpr));
-			const needsResize = canvas.width !== displayWidth || canvas.height !== displayHeight;
-			if (needsResize) {
-				canvas.width = displayWidth;
-				canvas.height = displayHeight;
-				// Keep CSS size in layout pixels.
-				canvas.style.width = container.clientWidth + 'px';
-				canvas.style.height = container.clientHeight + 'px';
-			}
-			return { width: canvas.width, height: canvas.height, dpr, needsResize };
-		}
-
-		// Initialize the JSCAD renderer
-		function initRenderer() {
-			try {
-				const size = resizeCanvasToDisplaySize();
-
-				// Initialize the official JSCAD regl-renderer
-				const { prepareRender, cameras, controls } = jscadReglRenderer;
-				
-				// Set up camera with defaults and ensure all properties are set
-				const perspectiveCamera = cameras.perspective;
-				let camera = Object.assign({}, perspectiveCamera.defaults);
-				
-				// Update camera projection for canvas size
-				camera = perspectiveCamera.setProjection(camera, camera, {
-					width: size.width,
-					height: size.height
-				});
-				
-				// Update camera view matrix
-				camera = perspectiveCamera.update(camera, camera);
-				
-				console.log('Initialized camera:', camera);
-				
-				// Set up orbit controls with defaults and disable auto features
-				const orbitControls = controls.orbit;
-				let controlState = Object.assign({}, orbitControls.defaults);
-				
-				// Disable auto zoom-to-fit so manual controls work
-				if (controlState.zoomToFit) {
-					controlState.zoomToFit.auto = false;
-				}
-				// Disable auto rotate
-				if (controlState.autoRotate) {
-					controlState.autoRotate.enabled = false;
-				}
-				
-				console.log('Initialized controls:', controlState);
-				
-				// Prepare renderer with canvas
-				const renderOptions = {
-					glOptions: { canvas }
-				};
-				
-				const renderFunc = prepareRender(renderOptions);
-				
-				// Store everything we need for rendering
-				renderer = {
-					render: renderFunc,
-					camera: camera,
-					controls: controlState,
-					orbitControls: orbitControls,
-					perspectiveCamera: perspectiveCamera,
-					drawCommands: jscadReglRenderer.drawCommands
-				};
-				
-				console.log('Renderer initialized:', renderer);
-				
-				// Set up mouse controls
-				setupMouseControls();
-				
-				clearError();
-				statusElement.textContent = 'Status: Renderer initialized';
-				return true;
-			} catch (error) {
-				console.error('Init error:', error);
-				showError('Failed to initialize renderer: ' + error.message);
-				return false;
-			}
+		// Three.js scene setup
+		let scene, camera, renderer, controls;
+		let meshGroup = new THREE.Group();
+		let animationFrameId = null;
+		
+		// Initialize Three.js
+		function initThreeJS() {
+			// Scene
+			scene = new THREE.Scene();
+			scene.background = new THREE.Color(0x2d2d2d);
+			
+			// Camera
+			const aspect = canvas.clientWidth / canvas.clientHeight;
+			camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+			camera.position.set(30, 30, 30);
+			camera.lookAt(0, 0, 0);
+			
+			// Renderer
+			renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+			renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+			renderer.setPixelRatio(window.devicePixelRatio);
+			
+			// Lights
+			const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+			scene.add(ambientLight);
+			
+			const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+			directionalLight1.position.set(10, 10, 10);
+			scene.add(directionalLight1);
+			
+			const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
+			directionalLight2.position.set(-10, -10, -5);
+			scene.add(directionalLight2);
+			
+			// Grid and axes
+			const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
+			scene.add(gridHelper);
+			
+			const axesHelper = new THREE.AxesHelper(15);
+			scene.add(axesHelper);
+			
+			// Add mesh group
+			scene.add(meshGroup);
+			
+			// Basic orbit controls (manual implementation)
+			setupControls();
+			
+			// Handle window resize
+			window.addEventListener('resize', onWindowResize);
+			
+			// Start render loop
+			animate();
+			
+			console.log('Three.js initialized');
+			statusElement.textContent = 'Status: Ready';
+			loadingElement.style.display = 'none';
 		}
 		
-		function setupMouseControls() {
+		function setupControls() {
 			let isDragging = false;
-			let lastX = 0;
-			let lastY = 0;
+			let previousMousePosition = { x: 0, y: 0 };
+			let cameraRotation = { theta: Math.PI / 4, phi: Math.PI / 4 };
+			let cameraDistance = 50;
 			
 			canvas.addEventListener('mousedown', (e) => {
 				isDragging = true;
-				lastX = e.clientX;
-				lastY = e.clientY;
+				previousMousePosition = { x: e.clientX, y: e.clientY };
 			});
 			
 			canvas.addEventListener('mousemove', (e) => {
-				if (isDragging && renderer) {
-					const deltaX = e.clientX - lastX;
-					const deltaY = e.clientY - lastY;
-					
-					// Update rotation deltas directly - these accumulate and are consumed by the update function
-					renderer.controls.thetaDelta += deltaX * 0.01;
-					renderer.controls.phiDelta += deltaY * 0.01;
-					
-					lastX = e.clientX;
-					lastY = e.clientY;
-					
-					// Re-render with updated camera
-					if (currentEntities.length > 0) {
-						renderScene();
-					}
-				}
+				if (!isDragging) return;
+				
+				const deltaX = e.clientX - previousMousePosition.x;
+				const deltaY = e.clientY - previousMousePosition.y;
+				
+				cameraRotation.theta -= deltaX * 0.01;
+				cameraRotation.phi -= deltaY * 0.01;
+				cameraRotation.phi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraRotation.phi));
+				
+				updateCameraPosition();
+				
+				previousMousePosition = { x: e.clientX, y: e.clientY };
 			});
 			
 			canvas.addEventListener('mouseup', () => {
 				isDragging = false;
 			});
 			
+			canvas.addEventListener('mouseleave', () => {
+				isDragging = false;
+			});
+			
 			canvas.addEventListener('wheel', (e) => {
 				e.preventDefault();
-				if (renderer) {
-					// Use controls.scale for zoom - smaller increments for smoother control
-					// Decrease scale = zoom in, increase scale = zoom out
-					const scaleDelta = e.deltaY > 0 ? 0.05 : -0.05;
-					renderer.controls.scale = Math.max(0.1, Math.min(10, renderer.controls.scale + scaleDelta));
-					
-					console.log('Zoom:', { deltaY: e.deltaY, newScale: renderer.controls.scale });
-					
-					// Re-render with updated camera
-					if (currentEntities.length > 0) {
-						renderScene();
-					}
-				}
+				cameraDistance += e.deltaY * 0.05;
+				cameraDistance = Math.max(5, Math.min(200, cameraDistance));
+				updateCameraPosition();
 			});
-		}
-
-		function renderScene() {
-			if (!renderer || !currentEntities || currentEntities.length === 0) {
-				return;
-			}
 			
-			try {
-				// Update camera from controls
-				const updated = renderer.orbitControls.update({
-					controls: renderer.controls,
-					camera: renderer.camera
-				});
-				
-				// Carefully update only the properties that changed
-				if (updated.controls) {
-					Object.keys(updated.controls).forEach(key => {
-						renderer.controls[key] = updated.controls[key];
-					});
-				}
-				if (updated.camera) {
-					Object.keys(updated.camera).forEach(key => {
-						renderer.camera[key] = updated.camera[key];
-					});
-				}
-				
-				// Render the scene with grid and axes for debugging
-				// Note: Grid and axes are rendered first to match official @jscad/regl-renderer demo pattern
-				renderer.render({
-					camera: renderer.camera,
-					drawCommands: renderer.drawCommands,
-					entities: [
-						// Grid for reference - use fixed cacheId for consistent caching
-						{
-							visuals: { drawCmd: 'drawGrid', show: true, cacheId: 'grid' },
-							size: [200, 200],
-							ticks: [10, 1],
-							// Ensure GL state doesn't pollute user entities
-							extras: {
-								blend: { enable: false },
-								polygonOffset: { enable: false },
-								depth: { enable: true }
-							}
-						},
-						// Axes for orientation - use fixed cacheId for consistent caching
-						{
-							visuals: { drawCmd: 'drawAxis', show: true, cacheId: 'axes' },
-							size: 50,
-							// Ensure GL state doesn't pollute user entities
-							extras: {
-								blend: { enable: false },
-								polygonOffset: { enable: false },
-								depth: { enable: true }
-							}
-						},
-						// User entities last
-						...currentEntities
-					]
-				});
-				
-				// Debug: log what we're rendering (keep lightweight)
-				const first = currentEntities[0];
-				if (first?.geometry?.indices?.length) {
-					let maxIndex = 0;
-					for (let i = 0; i < first.geometry.indices.length; i++) {
-						const v = first.geometry.indices[i];
-						if (v > maxIndex) maxIndex = v;
-					}
-					console.log('Rendering:', {
-						userEntities: currentEntities.length,
-						positions: first.geometry.positions?.length,
-						indices: first.geometry.indices.length,
-						maxIndex,
-						visuals: first.visuals
-					});
-				}
-			} catch (error) {
-				console.error('Render error:', error);
-				console.error('Error stack:', error.stack);
-				showError('Render error: ' + error.message);
-			}
-		}
-
-		function renderEntities(entities) {
-			if (!renderer) {
-				showError('Renderer not initialized');
-				return;
-			}
-
-			try {
-				// Increment batch ID when new entities arrive (parameter change, file reload, etc.)
-				// This ensures entities from different batches get different cacheIds,
-				// preventing buffer reuse across parameter changes.
-				renderBatchId++;
-				
-				// Any successful render should clear previous error overlays.
-				clearError();
-				// Convert arrays back to typed arrays for rendering
-				// NOTE: @jscad/regl-renderer drawMesh forces element type to uint16.
-				// Passing a Uint32Array here will corrupt indices (bytes interpreted as uint16),
-				// producing the "spiky"/random-triangle artifacts we've been seeing.
-				const processedEntities = entities.map((entity, entityIndex) => {
-					// CRITICAL: Assign a unique cacheId combining batch ID and entity index.
-					// prepareRender() caches draw commands by visuals.cacheId, and the draw command
-					// captures geometry buffers at creation time. This scheme:
-					// 1. Within same batch (camera movement): entities reuse same cacheId -> cache hit (fast!)
-					// 2. Across batches (parameter change): entities get new cacheId -> new draw command (correct!)
-					// This prevents GL state pollution where one entity affects another's rendering.
-					const visuals = Object.assign({}, entity.visuals);
-					visuals.cacheId = 'batch' + renderBatchId + '_entity' + entityIndex;
-					const processed = {
-						visuals,
-						geometry: {
-							type: entity.geometry.type,
-							isTransparent: entity.geometry.isTransparent
-						},
-						// Ensure consistent GL state for each mesh entity
-						extras: {
-							blend: { enable: false },
-							polygonOffset: { enable: false },
-							depth: { enable: true }
-						}
-					};
-
-					// Help renderer sort transparent entities correctly.
-					if (processed.geometry.isTransparent) {
-						processed.visuals.transparent = true;
-					}
-					
-					// Flatten nested arrays and convert to typed arrays
-					if (entity.geometry.positions) {
-						const positions = entity.geometry.positions;
-						let flatPositions;
-						if (Array.isArray(positions[0])) {
-							flatPositions = positions.flat();
-						} else if (typeof positions[0] === 'object') {
-							flatPositions = positions.flatMap(p => [p[0], p[1], p[2]]);
-						} else {
-							flatPositions = positions;
-						}
-						processed.geometry.positions = new Float32Array(flatPositions);
-					}
-					if (entity.geometry.normals) {
-						const normals = entity.geometry.normals;
-						let flatNormals;
-						if (Array.isArray(normals[0])) {
-							flatNormals = normals.flat();
-						} else if (typeof normals[0] === 'object') {
-							flatNormals = normals.flatMap(n => [n[0], n[1], n[2]]);
-						} else {
-							flatNormals = normals;
-						}
-						processed.geometry.normals = new Float32Array(flatNormals);
-					}
-					if (entity.geometry.indices) {
-						const indices = entity.geometry.indices;
-						let flatIndices;
-						if (Array.isArray(indices[0])) {
-							flatIndices = indices.flat();
-						} else if (typeof indices[0] === 'object') {
-							flatIndices = indices.flatMap(i => [i[0], i[1], i[2]]);
-						} else {
-							flatIndices = indices;
-						}
-						let maxIndex = 0;
-						for (let i = 0; i < flatIndices.length; i++) {
-							const v = flatIndices[i];
-							if (v > maxIndex) maxIndex = v;
-						}
-						if (maxIndex > 65535) {
-							throw new Error('Mesh has index ' + maxIndex + ' (> 65535). drawMesh uses uint16 indices.');
-						}
-						processed.geometry.indices = new Uint16Array(flatIndices);
-					}
-					if (entity.geometry.colors) {
-						const colors = entity.geometry.colors;
-						let flatColors;
-						if (Array.isArray(colors[0])) {
-							flatColors = colors.flat();
-						} else if (typeof colors[0] === 'object') {
-							flatColors = colors.flatMap(c => [c[0], c[1], c[2], c[3] || 1.0]);
-						} else {
-							flatColors = colors;
-						}
-						processed.geometry.colors = new Float32Array(flatColors);
-					}
-					if (entity.geometry.transforms) {
-						processed.geometry.transforms = new Float32Array(entity.geometry.transforms);
-					}
-					if (entity.geometry.points) {
-						processed.geometry.points = new Float32Array(entity.geometry.points);
-					}
-					
-					// Validate attribute lengths to avoid shaders reading garbage.
-					// Garbage in normals/colors often shows up as "white blocks" or blown-out lighting.
-					const positionsTA = processed.geometry.positions;
-					if (positionsTA && positionsTA.length > 0) {
-						const vertexCount = Math.floor(positionsTA.length / 3);
-						const expectedNormals = vertexCount * 3;
-						const expectedColors = vertexCount * 4;
-
-						if (processed.geometry.normals && processed.geometry.normals.length !== expectedNormals) {
-							console.warn('Normals length mismatch; replacing normals.', {
-								entityIndex,
-								got: processed.geometry.normals.length,
-								expected: expectedNormals
-							});
-							const fallbackNormals = new Float32Array(expectedNormals);
-							for (let i = 0; i < expectedNormals; i += 3) {
-								fallbackNormals[i] = 0;
-								fallbackNormals[i + 1] = 0;
-								fallbackNormals[i + 2] = 1;
-							}
-							processed.geometry.normals = fallbackNormals;
-						}
-
-						if (processed.geometry.colors && processed.geometry.colors.length !== expectedColors) {
-							console.warn('Colors length mismatch; disabling vertex colors for entity.', {
-								entityIndex,
-								got: processed.geometry.colors.length,
-								expected: expectedColors
-							});
-							delete processed.geometry.colors;
-							processed.visuals.useVertexColors = false;
-							// Prefer any existing visuals.color, else a neutral gray.
-							if (!processed.visuals.color) {
-								processed.visuals.color = [0.7, 0.7, 0.7, 1.0];
-							}
-						}
-					}
-
-					return processed;
-				});
-				
-				// Store entities for re-rendering on resize
-				currentEntities = processedEntities;
-
-				// Debug: show visuals (and ensure cacheId is not present)
-				try {
-					console.log('Current entities visuals:', currentEntities.map(e => e.visuals));
-					console.log('Current entities cacheIds:', currentEntities.map(e => e.visuals && e.visuals.cacheId));
-				} catch (e) {
-					// ignore logging failures
-				}
-
-				// Auto-zoom to fit the geometry
-				autoZoomToFit(processedEntities);
-
-				// Render the scene with the pre-converted entities
-				renderScene();
-				
-				loadingElement.style.display = 'none';
-				statusElement.textContent = 'Status: Rendered ' + entities.length + ' entit' + (entities.length === 1 ? 'y' : 'ies');
-			} catch (error) {
-				showError('Rendering failed: ' + error.message);
+			function updateCameraPosition() {
+				camera.position.x = cameraDistance * Math.sin(cameraRotation.phi) * Math.cos(cameraRotation.theta);
+				camera.position.y = cameraDistance * Math.cos(cameraRotation.phi);
+				camera.position.z = cameraDistance * Math.sin(cameraRotation.phi) * Math.sin(cameraRotation.theta);
+				camera.lookAt(0, 0, 0);
 			}
 		}
 		
-		function autoZoomToFit(entities) {
-			// Calculate bounding box of all entities
-			let minX = Infinity, minY = Infinity, minZ = Infinity;
-			let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-			let hasPositions = false;
+		function onWindowResize() {
+			camera.aspect = canvas.clientWidth / canvas.clientHeight;
+			camera.updateProjectionMatrix();
+			renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+		}
+		
+		function animate() {
+			animationFrameId = requestAnimationFrame(animate);
+			renderer.render(scene, camera);
+		}
+		
+		function clearScene() {
+			while (meshGroup.children.length > 0) {
+				const child = meshGroup.children[0];
+				meshGroup.remove(child);
+				if (child.geometry) child.geometry.dispose();
+				if (child.material) child.material.dispose();
+			}
+		}
+		
+		function renderGeometries(geometries) {
+			console.log('Rendering', geometries.length, 'geometries');
+			clearScene();
 			
-			entities.forEach(entity => {
-				if (entity.geometry && entity.geometry.positions) {
-					hasPositions = true;
-					const positions = entity.geometry.positions;
-					for (let i = 0; i < positions.length; i += 3) {
-						minX = Math.min(minX, positions[i]);
-						minY = Math.min(minY, positions[i + 1]);
-						minZ = Math.min(minZ, positions[i + 2]);
-						maxX = Math.max(maxX, positions[i]);
-						maxY = Math.max(maxY, positions[i + 1]);
-						maxZ = Math.max(maxZ, positions[i + 2]);
+			for (const geom of geometries) {
+				try {
+					if (geom.type === 'geom3') {
+						const geometry = convertGeom3ToBufferGeometry(geom, THREE);
+						const material = new THREE.MeshStandardMaterial({
+							color: 0x4488ff,
+							metalness: 0.3,
+							roughness: 0.7,
+							side: THREE.DoubleSide
+						});
+						const mesh = new THREE.Mesh(geometry, material);
+						meshGroup.add(mesh);
+						console.log('Added geom3 mesh');
+					} else if (geom.type === 'geom2') {
+						const geometry = convertGeom2ToLineGeometry(geom, THREE);
+						const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+						const line = new THREE.LineSegments(geometry, material);
+						meshGroup.add(line);
+						console.log('Added geom2 lines');
 					}
+				} catch (error) {
+					console.error('Error converting geometry:', error);
 				}
-			});
-			
-			// If no geometry found, use defaults
-			if (!hasPositions || !isFinite(minX)) {
-				console.log('No valid geometry bounds, skipping auto-zoom');
-				return;
 			}
 			
-			// Calculate center and size
-			const centerX = (minX + maxX) / 2;
-			const centerY = (minY + maxY) / 2;
-			const centerZ = (minZ + maxZ) / 2;
-			const sizeX = maxX - minX;
-			const sizeY = maxY - minY;
-			const sizeZ = maxZ - minZ;
-			const maxSize = Math.max(sizeX, sizeY, sizeZ, 1); // at least 1 to avoid division by zero
-			
-			// Position camera to view the geometry
-			const distance = maxSize * 2.5;
-			
-			// Directly update camera target and position values in place
-			renderer.camera.target[0] = centerX;
-			renderer.camera.target[1] = centerY;
-			renderer.camera.target[2] = centerZ;
-			
-			renderer.camera.position[0] = centerX + distance * 0.5;
-			renderer.camera.position[1] = centerY - distance * 0.7;
-			renderer.camera.position[2] = centerZ + distance * 0.7;
-			
-			// Force view matrix recalculation by setting scale to trigger update
-			renderer.controls.scale = 1.0;
-			
-			console.log('Auto-zoom:', { center: [centerX, centerY, centerZ], distance, maxSize, bounds: { minX, maxX, minY, maxY, minZ, maxZ } });
+			statusElement.textContent = \`Status: Rendered \${geometries.length} object(s)\`;
 		}
-
+		
 		function showError(message) {
 			errorElement.textContent = message;
 			errorElement.style.display = 'block';
-			loadingElement.style.display = 'none';
-			statusElement.textContent = 'Status: Error - ' + message;
+			statusElement.textContent = 'Status: Error';
 		}
-
-		// Handle window resize
-		window.addEventListener('resize', () => {
-			if (renderer) {
-				const size = resizeCanvasToDisplaySize();
-				
-				// Update camera projection with new canvas size - merge results
-				const updated = renderer.perspectiveCamera.setProjection(
-					renderer.camera,
-					renderer.camera,
-					{ width: size.width, height: size.height }
-				);
-				renderer.camera = Object.assign({}, renderer.camera, updated);
-				
-				// Re-render on resize
-				if (currentEntities.length > 0) {
-					renderScene();
-				}
+		
+		function hideError() {
+			errorElement.style.display = 'none';
+		}
+		
+		function updateParameterUI(parameters) {
+			if (!parameters || !parameters.definitions || parameters.definitions.length === 0) {
+				parameterPanel.classList.remove('visible');
+				return;
 			}
+			
+			parameterPanel.classList.add('visible');
+			parameterContent.innerHTML = '';
+			
+			for (const def of parameters.definitions) {
+				const item = document.createElement('div');
+				item.className = 'parameter-item';
+				
+				const label = document.createElement('label');
+				label.className = 'parameter-label';
+				label.textContent = def.caption || def.name;
+				item.appendChild(label);
+				
+				const currentValue = parameters.values[def.name] !== undefined 
+					? parameters.values[def.name] 
+					: def.initial;
+				
+				if (def.type === 'checkbox') {
+					const checkboxLabel = document.createElement('label');
+					checkboxLabel.className = 'parameter-checkbox-label';
+					const checkbox = document.createElement('input');
+					checkbox.type = 'checkbox';
+					checkbox.className = 'parameter-input parameter-checkbox';
+					checkbox.checked = currentValue;
+					checkbox.addEventListener('change', () => {
+						vscode.postMessage({
+							type: 'parameterChanged',
+							filePath: parameters.filePath,
+							name: def.name,
+							value: checkbox.checked
+						});
+					});
+					checkboxLabel.appendChild(checkbox);
+					checkboxLabel.appendChild(document.createTextNode(' ' + (def.caption || def.name)));
+					item.innerHTML = '';
+					item.appendChild(checkboxLabel);
+				} else if (def.type === 'slider' || (def.type === 'number' && def.min !== undefined && def.max !== undefined)) {
+					const slider = document.createElement('input');
+					slider.type = 'range';
+					slider.className = 'parameter-input parameter-slider';
+					slider.min = def.min || 0;
+					slider.max = def.max || 100;
+					slider.step = def.step || 1;
+					slider.value = currentValue;
+					
+					const valueDisplay = document.createElement('div');
+					valueDisplay.className = 'parameter-value';
+					valueDisplay.textContent = currentValue;
+					
+					slider.addEventListener('input', () => {
+						valueDisplay.textContent = slider.value;
+						vscode.postMessage({
+							type: 'parameterChanged',
+							filePath: parameters.filePath,
+							name: def.name,
+							value: parseFloat(slider.value)
+						});
+					});
+					
+					item.appendChild(slider);
+					item.appendChild(valueDisplay);
+				} else {
+					const input = document.createElement('input');
+					input.type = 'text';
+					input.className = 'parameter-input';
+					input.value = currentValue;
+					input.addEventListener('change', () => {
+						let value = input.value;
+						if (def.type === 'number' || def.type === 'int' || def.type === 'float') {
+							value = parseFloat(value);
+						}
+						vscode.postMessage({
+							type: 'parameterChanged',
+							filePath: parameters.filePath,
+							name: def.name,
+							value
+						});
+					});
+					item.appendChild(input);
+				}
+				
+				parameterContent.appendChild(item);
+			}
+		}
+		
+		// Parameter panel collapse
+		document.getElementById('parameter-header').addEventListener('click', () => {
+			parameterContent.classList.toggle('collapsed');
+			collapseButton.textContent = parameterContent.classList.contains('collapsed') ? '▶' : '▼';
 		});
-
-		// Listen for messages from extension
-		window.addEventListener('message', event => {
+		
+		// Message handling
+		window.addEventListener('message', (event) => {
 			const message = event.data;
 			switch (message.type) {
 				case 'renderEntities':
-					if (message.entities && message.entities.length > 0) {
-						renderEntities(message.entities);
-						// Update parameter panel if parameters are provided
-						if (message.parameters) {
-							updateParameterPanel(message.parameters);
-						}
-					} else {
-						showError('No entity data received');
+					hideError();
+					renderGeometries(message.entities);
+					if (message.parameters) {
+						updateParameterUI(message.parameters);
 					}
 					break;
 				case 'error':
@@ -964,201 +809,12 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					break;
 			}
 		});
-
-		// Parameter panel management
-		const parameterPanel = document.getElementById('parameter-panel');
-		const parameterContent = document.getElementById('parameter-content');
-		const parameterHeader = document.getElementById('parameter-header');
-		const collapseButton = document.getElementById('collapse-button');
-		let isCollapsed = false;
-		let currentFilePath = '';
-
-		// Toggle collapse
-		parameterHeader.addEventListener('click', () => {
-			isCollapsed = !isCollapsed;
-			parameterContent.classList.toggle('collapsed', isCollapsed);
-			collapseButton.textContent = isCollapsed ? '▶' : '▼';
-		});
-
-		function sendParameterChange(name, value) {
-			console.log('Parameter changed:', name, value);
-			vscode.postMessage({
-				type: 'parameterChanged',
-				name: name,
-				value: value,
-				filePath: currentFilePath
-			});
-		}
-
-		// Helper function to determine if parameter should use slider input
-		function shouldUseSlider(def) {
-			return def.type === 'slider' || ((def.type === 'number' || def.type === 'int' || def.type === 'float') && def.min !== undefined && def.max !== undefined);
-		}
-
-		function updateParameterPanel(parameters) {
-			const { definitions, values, filePath } = parameters;
-			currentFilePath = filePath;
-			
-			if (!definitions || definitions.length === 0) {
-				parameterPanel.classList.remove('visible');
-				return;
-			}
-
-			// Clear existing content
-			parameterContent.innerHTML = '';
-
-			// Create inputs for each parameter
-			definitions.forEach(def => {
-				const paramDiv = document.createElement('div');
-				paramDiv.className = 'parameter-item';
-
-				const label = document.createElement('label');
-				label.className = 'parameter-label';
-				label.textContent = def.caption || def.name;
-
-				let input;
-				const currentValue = values[def.name];
-
-				if (def.type === 'checkbox') {
-					const checkboxLabel = document.createElement('label');
-					checkboxLabel.className = 'parameter-checkbox-label';
-					
-					input = document.createElement('input');
-					input.type = 'checkbox';
-					input.className = 'parameter-input parameter-checkbox';
-					input.checked = currentValue;
-					input.addEventListener('change', () => {
-						sendParameterChange(def.name, input.checked);
-					});
-					
-					checkboxLabel.appendChild(input);
-					checkboxLabel.appendChild(document.createTextNode(def.caption || def.name));
-					paramDiv.appendChild(checkboxLabel);
-				} else if (def.type === 'choice') {
-					paramDiv.appendChild(label);
-					
-					input = document.createElement('select');
-					input.className = 'parameter-input';
-					
-					(def.values || []).forEach((value, index) => {
-						const option = document.createElement('option');
-						option.value = String(value);
-						option.textContent = (def.captions && def.captions[index]) || String(value);
-						if (currentValue !== undefined && String(value) === String(currentValue)) {
-							option.selected = true;
-						}
-						input.appendChild(option);
-					});
-					
-					input.addEventListener('change', () => {
-						const selectedIndex = input.selectedIndex;
-						const valuesArray = def.values || [];
-						const selectedValue = valuesArray[selectedIndex];
-						sendParameterChange(def.name, selectedValue !== undefined ? selectedValue : input.value);
-					});
-					
-					paramDiv.appendChild(input);
-				} else if (shouldUseSlider(def)) {
-					paramDiv.appendChild(label);
-					
-					input = document.createElement('input');
-					input.type = 'range';
-					input.className = 'parameter-input parameter-slider';
-					input.min = def.min !== undefined ? def.min : 0;
-					input.max = def.max !== undefined ? def.max : 100;
-					input.step = def.step !== undefined ? def.step : 1;
-					input.value = currentValue;
-					
-					const valueDisplay = document.createElement('div');
-					valueDisplay.className = 'parameter-value';
-					valueDisplay.textContent = 'Value: ' + currentValue;
-					
-					input.addEventListener('input', () => {
-						valueDisplay.textContent = 'Value: ' + input.value;
-					});
-					
-					input.addEventListener('change', () => {
-						const value = def.type === 'int' ? parseInt(input.value) : parseFloat(input.value);
-						sendParameterChange(def.name, value);
-					});
-					
-					paramDiv.appendChild(input);
-					paramDiv.appendChild(valueDisplay);
-				} else {
-					// Default to text input for number, text, etc.
-					paramDiv.appendChild(label);
-					
-					input = document.createElement('input');
-					input.className = 'parameter-input';
-					
-					if (def.type === 'number' || def.type === 'int' || def.type === 'float') {
-						input.type = 'number';
-						if (def.min !== undefined) input.min = def.min;
-						if (def.max !== undefined) input.max = def.max;
-						if (def.step !== undefined) {
-							input.step = def.step;
-						} else {
-							input.step = def.type === 'int' ? '1' : 'any';
-						}
-					} else if (def.type === 'color') {
-						input.type = 'color';
-					} else if (def.type === 'date') {
-						input.type = 'date';
-					} else if (def.type === 'email') {
-						input.type = 'email';
-					} else if (def.type === 'password') {
-						input.type = 'password';
-					} else if (def.type === 'url') {
-						input.type = 'url';
-					} else {
-						input.type = 'text';
-					}
-					
-					// Ensure int values are displayed as integers
-					input.value = def.type === 'int' && typeof currentValue === 'number' 
-						? String(Math.floor(currentValue))
-						: String(currentValue);
-					
-					input.addEventListener('change', () => {
-						let value = input.value;
-						if (def.type === 'number' || def.type === 'float') {
-							const parsed = parseFloat(value);
-							value = isNaN(parsed)
-								? (def.initial !== undefined
-									? def.initial
-									: (def.min !== undefined ? def.min : undefined))
-								: parsed;
-						} else if (def.type === 'int') {
-							const parsed = parseInt(value);
-							value = isNaN(parsed)
-								? (def.initial !== undefined
-									? def.initial
-									: (def.min !== undefined ? def.min : undefined))
-								: parsed;
-						}
-						sendParameterChange(def.name, value);
-					});
-					
-					paramDiv.appendChild(input);
-				}
-
-				parameterContent.appendChild(paramDiv);
-			});
-
-			// Show the panel
-			parameterPanel.classList.add('visible');
-		}
-
-		// Initialize renderer and notify extension we're ready
-		if (typeof jscadReglRenderer !== 'undefined') {
-			if (initRenderer()) {
-				loadingElement.style.display = 'none';
-				statusElement.textContent = 'Status: Ready';
-				vscode.postMessage({ type: 'ready' });
-			}
-		} else {
-			showError('JSCAD renderer library not loaded');
-		}
+		
+		// Initialize
+		initThreeJS();
+		
+		// Signal ready
+		vscode.postMessage({ type: 'ready' });
 	</script>
 </body>
 </html>`;

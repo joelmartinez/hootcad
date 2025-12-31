@@ -307,13 +307,13 @@ module.exports = { main }
 		test('executeJscadFile handles 2D geometries', async () => {
 			const filePath = path.join(fixturesPath, 'valid-2d.jscad');
 			
-			const entities = await executeJscadFile(filePath, mockOutputChannel);
+			const geometries = await executeJscadFile(filePath, mockOutputChannel);
 			
-			assert.ok(Array.isArray(entities), 'Should return array');
-			assert.ok(entities.length >= 2, 'Should return entities for 2D geometries');
-			// Entities should have proper draw commands for 2D
-			const hasLineDrawCmd = entities.some(e => e.visuals && e.visuals.drawCmd === 'drawLines');
-			assert.ok(hasLineDrawCmd, 'Should have entities with drawLines command for 2D geometry');
+			assert.ok(Array.isArray(geometries), 'Should return array');
+			assert.ok(geometries.length >= 2, 'Should return geometries for 2D geometries');
+			// Geometries should have type 'geom2' for 2D
+			const hasGeom2 = geometries.some(g => g.type === 'geom2');
+			assert.ok(hasGeom2, 'Should have geom2 geometries for 2D geometry');
 		});
 	});
 
@@ -352,8 +352,8 @@ module.exports = { main }
 			await executeJscadFile(filePath, testOutputChannel);
 			
 			assert.ok(logs.some(log => log.includes('Executing JSCAD file')), 'Should log execution start');
-			assert.ok(logs.some(log => log.includes('executed successfully')), 'Should log success');
-			assert.ok(logs.some(log => log.includes('Converted')), 'Should log entity conversion');
+			assert.ok(logs.some(log => log.includes('executed successfully') || log.includes('Executed JSCAD')), 'Should log success');
+			assert.ok(logs.some(log => log.includes('geom3')), 'Should log geometry type');
 		});
 
 		test('executeJscadFile logs errors to output channel', async () => {
