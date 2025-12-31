@@ -553,7 +553,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 			
 			// Lights - studio-style setup
-			const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+			const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
 			scene.add(ambientLight);
 			
 			// Key light (main)
@@ -573,10 +573,11 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			scene.add(rimLight);
 			
 			// Grid and axes - subtle gray/blue grid
-			const gridHelper = new THREE.GridHelper(50, 50, 0x8899aa, 0xc5d0dd);
+			// 400mm x 400mm grid (typical 3D printer build plate size) with 40 divisions (10mm each)
+			const gridHelper = new THREE.GridHelper(400, 40, 0x8899aa, 0xc5d0dd);
 			scene.add(gridHelper);
 			
-			const axesHelper = new THREE.AxesHelper(15);
+			const axesHelper = new THREE.AxesHelper(100);
 			scene.add(axesHelper);
 		scene.add(axesHelper);
 			
@@ -687,8 +688,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 						
 						const material = new THREE.MeshStandardMaterial({
 							color: color,
-							metalness: 0.7,
-							roughness: 0.3,
+							metalness: 0.5,
+							roughness: 0.5,
 							side: THREE.DoubleSide
 						});
 						const mesh = new THREE.Mesh(geometry, material);
