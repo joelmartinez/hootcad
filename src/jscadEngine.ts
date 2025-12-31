@@ -30,6 +30,17 @@ function loadJscadModuleFromFile(filePath: string, outputChannel: vscode.OutputC
 
     // Create a custom require that tries both the file's directory and extension's node_modules
     const customRequire = (moduleName: string) => {
+        // Handle relative requires (./ or ../)
+        if (moduleName.startsWith('./') || moduleName.startsWith('../')) {
+            const resolvedPath = path.resolve(dirname, moduleName);
+            // If it's a .jscad file, load it recursively
+            if (resolvedPath.endsWith('.jscad')) {
+                return loadJscadModuleFromFile(resolvedPath, outputChannel);
+            }
+            // Otherwise use standard Node require
+            return nodeRequire(resolvedPath);
+        }
+        
         try {
             // First try to require from the file's directory / Node resolution
             return nodeRequire(moduleName);
