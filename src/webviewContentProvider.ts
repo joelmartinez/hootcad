@@ -81,7 +81,7 @@ this.context.extensionPath,
 try {
 return fs.readFileSync(cssPath, 'utf8');
 } catch (error) {
-console.error('Failed to read CSS file:', error);
+console.error('Failed to read CSS file:', cssPath, error);
 // Return empty string as fallback
 return '';
 }
