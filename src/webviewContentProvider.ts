@@ -159,6 +159,18 @@ const parameterPanel = document.getElementById('parameter-panel');
 const parameterContent = document.getElementById('parameter-content');
 const collapseButton = document.getElementById('collapse-button');
 
+// Brighter, JSCAD-like CAD preview lighting + color management.
+// These are the knobs to tweak if you want to tune the overall look.
+const LIGHTING_PRESET = {
+	ambientIntensity: 0.3,
+	hemiIntensity: 1.0,
+	keyIntensity: 1.6,
+	fillIntensity: 0.6,
+	rimIntensity: 0.35,
+	exposure: 1.35,
+	toneMapping: THREE.ACESFilmicToneMapping
+};
+
 // Three.js scene setup
 let scene, camera, renderer, controls;
 let meshGroup = new THREE.Group();
@@ -207,27 +219,41 @@ syncControlsFromCamera();
 renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(canvas.clientWidth, canvas.clientHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-// Lights - studio-style setup
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+// Color management / output transform
+// Ensure we render in sRGB while lighting stays linear (avoid double-gamma).
+if (THREE.ColorManagement) {
+	THREE.ColorManagement.enabled = true;
+}
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = LIGHTING_PRESET.toneMapping;
+renderer.toneMappingExposure = LIGHTING_PRESET.exposure;
+
+// Avoid deep, crushed shadows for a CAD-preview look.
+renderer.shadowMap.enabled = false;
+
+// Lights - JSCAD-like CAD studio preset
+// Fill lighting so faces aren't near-black
+const ambientLight = new THREE.AmbientLight(0xffffff, LIGHTING_PRESET.ambientIntensity);
 scene.add(ambientLight);
 
-// Key light (main)
-const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
-keyLight.position.set(20, 30, 20);
-keyLight.castShadow = true;
+const hemiLight = new THREE.HemisphereLight(0xffffff, 0x9aa6b2, LIGHTING_PRESET.hemiIntensity);
+hemiLight.position.set(0, 1, 0);
+scene.add(hemiLight);
+
+// Key light (crisp highlights) - above/front-left-ish
+const keyLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.keyIntensity);
+keyLight.position.set(30, 50, 25);
 scene.add(keyLight);
 
-// Fill light (softer, from opposite side)
-const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-fillLight.position.set(-20, 10, -10);
+// Fill light (soft, opposite side)
+const fillLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.fillIntensity);
+fillLight.position.set(-35, 25, 15);
 scene.add(fillLight);
 
-// Rim light (from behind/below for edge definition)
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-rimLight.position.set(0, -10, -20);
+// Rim/back light (lift silhouettes)
+const rimLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.rimIntensity);
+rimLight.position.set(0, 15, -45);
 scene.add(rimLight);
 
 // Grid and axes - subtle gray/blue grid
