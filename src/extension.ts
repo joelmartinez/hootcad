@@ -537,8 +537,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		function initThreeJS() {
 			// Scene
 			scene = new THREE.Scene();
-			scene.background = new THREE.Color(0x2d2d2d);
-			
+			scene.background = new THREE.Color(0xf5f5f5); // Near-white background
+		
 			// Camera
 			const aspect = canvas.clientWidth / canvas.clientHeight;
 			camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
@@ -549,25 +549,36 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 			renderer.setSize(canvas.clientWidth, canvas.clientHeight);
 			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.shadowMap.enabled = true;
+			renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 			
-			// Lights
-			const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+			// Lights - studio-style setup
+			const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
 			scene.add(ambientLight);
 			
-			const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
-			directionalLight1.position.set(10, 10, 10);
-			scene.add(directionalLight1);
+			// Key light (main)
+			const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+			keyLight.position.set(20, 30, 20);
+			keyLight.castShadow = true;
+			scene.add(keyLight);
 			
-			const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.3);
-			directionalLight2.position.set(-10, -10, -5);
-			scene.add(directionalLight2);
+			// Fill light (softer, from opposite side)
+			const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
+			fillLight.position.set(-20, 10, -10);
+			scene.add(fillLight);
 			
-			// Grid and axes
-			const gridHelper = new THREE.GridHelper(50, 50, 0x444444, 0x222222);
+			// Rim light (from behind/below for edge definition)
+			const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+			rimLight.position.set(0, -10, -20);
+			scene.add(rimLight);
+			
+			// Grid and axes - subtle gray/blue grid
+			const gridHelper = new THREE.GridHelper(50, 50, 0x8899aa, 0xc5d0dd);
 			scene.add(gridHelper);
 			
 			const axesHelper = new THREE.AxesHelper(15);
 			scene.add(axesHelper);
+		scene.add(axesHelper);
 			
 			// Add mesh group
 			scene.add(meshGroup);
@@ -664,8 +675,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					if (geom.type === 'geom3') {
 						const geometry = convertGeom3ToBufferGeometry(geom, THREE);
 						
-						// Determine color - use geom color if available, otherwise default blue
-						let color = 0x4488ff;
+						// Determine color - use geom color if available, otherwise default metal gray
+						let color = 0xb0b8c0; // Light metal gray
 						if (geom.color && Array.isArray(geom.color) && geom.color.length >= 3) {
 							// Convert from [r, g, b, a] (0-1) to hex color
 							const r = Math.round(geom.color[0] * 255);
@@ -676,8 +687,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 						
 						const material = new THREE.MeshStandardMaterial({
 							color: color,
-							metalness: 0.3,
-							roughness: 0.7,
+							metalness: 0.7,
+							roughness: 0.3,
 							side: THREE.DoubleSide
 						});
 						const mesh = new THREE.Mesh(geometry, material);
@@ -695,8 +706,8 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 					} else if (geom.type === 'geom2') {
 						const geometry = convertGeom2ToLineGeometry(geom, THREE);
 						
-						// Determine color - use geom color if available, otherwise default green
-						let color = 0x00ff00;
+						// Determine color - use geom color if available, otherwise default dark blue
+						let color = 0x2266cc; // Dark blue for visibility on white
 						if (geom.color && Array.isArray(geom.color) && geom.color.length >= 3) {
 							const r = Math.round(geom.color[0] * 255);
 							const g = Math.round(geom.color[1] * 255);
@@ -704,7 +715,7 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 							color = (r << 16) | (g << 8) | b;
 						}
 						
-						const material = new THREE.LineBasicMaterial({ color: color });
+						const material = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
 						const line = new THREE.LineSegments(geometry, material);
 						
 						// Apply transforms if available
