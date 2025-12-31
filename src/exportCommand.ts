@@ -270,6 +270,8 @@ async function performExport(
         },
         async (progress) => {
             try {
+                let lastProgressValue = 0;
+                
                 progress.report({ increment: 0, message: 'Loading JSCAD file...' });
 
                 // Execute the JSCAD file to get geometries
@@ -279,10 +281,13 @@ async function performExport(
                     throw new Error('No geometries generated from JSCAD file');
                 }
 
+                lastProgressValue = 30;
                 progress.report({ increment: 30, message: 'Serializing...' });
 
                 // Dynamically load the serializer
-                const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
+                // Use eval to get real Node.js require (same approach as jscadEngine.ts)
+                const nodeRequire = eval('require');
+                const extensionRequire = createRequire(nodeRequire.resolve('@jscad/modeling'));
                 const serializer = extensionRequire(format.serializerPackage);
 
                 // Convert serialized geometries back to JSCAD modeling objects
@@ -293,19 +298,28 @@ async function performExport(
                 const serializerOptions = {
                     ...options,
                     statusCallback: (status: { progress: number }) => {
-                        // Map serializer progress (0-100) to our remaining 70%
-                        const increment = (status.progress / 100) * 70;
-                        progress.report({ 
-                            increment, 
-                            message: `Serializing... ${status.progress}%` 
-                        });
+                        // Map serializer progress (0-100) to our remaining progress (30-90)
+                        const targetProgress = 30 + (status.progress / 100) * 60;
+                        const increment = targetProgress - lastProgressValue;
+                        if (increment > 0) {
+                            lastProgressValue = targetProgress;
+                            progress.report({ 
+                                increment, 
+                                message: `Serializing... ${status.progress}%` 
+                            });
+                        }
                     }
                 };
 
                 // Serialize
                 const data = serializer.serialize(serializerOptions, ...jscadGeometries);
 
-                progress.report({ increment: 90, message: 'Writing file...' });
+                // Report remaining progress to 90%
+                const remaining = 90 - lastProgressValue;
+                if (remaining > 0) {
+                    progress.report({ increment: remaining, message: 'Writing file...' });
+                    lastProgressValue = 90;
+                }
 
                 // Write to file
                 if (Array.isArray(data) && data.length > 0) {
@@ -325,7 +339,7 @@ async function performExport(
                     throw new Error('Serializer returned empty result');
                 }
 
-                progress.report({ increment: 100, message: 'Complete!' });
+                progress.report({ increment: 10, message: 'Complete!' });
 
                 // Show success message
                 const filename = extractFilename(targetFilePath);
@@ -349,14 +363,26 @@ async function performExport(
 }
 
 /**
+ * Serialized geometry from JSCAD execution
+ */
+interface SerializedGeometry {
+    type: 'geom3' | 'geom2' | 'unknown';
+    polygons?: any[];
+    sides?: any[];
+    transforms?: any;
+    color?: any;
+    data?: any;
+}
+
+/**
  * Convert serialized geometries back to JSCAD modeling objects
  */
-function convertToJscadGeometries(serializedGeometries: any[], modeling: any): any[] {
+function convertToJscadGeometries(serializedGeometries: SerializedGeometry[], modeling: any): any[] {
     return serializedGeometries.map(serialized => {
-        if (serialized.type === 'geom3') {
+        if (serialized.type === 'geom3' && serialized.polygons) {
             // Reconstruct geom3 from serialized data
             return modeling.geometries.geom3.create(serialized.polygons);
-        } else if (serialized.type === 'geom2') {
+        } else if (serialized.type === 'geom2' && serialized.sides) {
             // Reconstruct geom2 from serialized data
             return modeling.geometries.geom2.create(serialized.sides);
         } else {

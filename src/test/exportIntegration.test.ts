@@ -23,9 +23,30 @@ suite('Export Integration Test Suite', () => {
     
     const mockOutputChannel = createMockOutputChannel();
     
+    /**
+     * Helper function to convert serialized geometries to JSCAD modeling objects
+     */
+    const convertGeometries = (geometries: any[], modeling: any): any[] => {
+        return geometries.map(serialized => {
+            if (serialized.type === 'geom3') {
+                return modeling.geometries.geom3.create(serialized.polygons);
+            } else if (serialized.type === 'geom2') {
+                return modeling.geometries.geom2.create(serialized.sides);
+            }
+            return serialized;
+        });
+    };
+    
+    /**
+     * Helper to get extension require
+     */
+    const getExtensionRequire = () => {
+        return createRequire(path.join(__dirname, '../../../package.json'));
+    };
+    
     suite('JSCAD Serializer Integration', () => {
         test('STL serializer can be loaded', () => {
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             assert.doesNotThrow(() => {
                 const stlSerializer = extensionRequire('@jscad/stl-serializer');
                 assert.ok(stlSerializer, 'STL serializer should load');
@@ -34,7 +55,7 @@ suite('Export Integration Test Suite', () => {
         });
         
         test('OBJ serializer can be loaded', () => {
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             assert.doesNotThrow(() => {
                 const objSerializer = extensionRequire('@jscad/obj-serializer');
                 assert.ok(objSerializer, 'OBJ serializer should load');
@@ -43,7 +64,7 @@ suite('Export Integration Test Suite', () => {
         });
         
         test('SVG serializer can be loaded', () => {
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             assert.doesNotThrow(() => {
                 const svgSerializer = extensionRequire('@jscad/svg-serializer');
                 assert.ok(svgSerializer, 'SVG serializer should load');
@@ -52,7 +73,7 @@ suite('Export Integration Test Suite', () => {
         });
         
         test('JSON serializer can be loaded', () => {
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             assert.doesNotThrow(() => {
                 const jsonSerializer = extensionRequire('@jscad/json-serializer');
                 assert.ok(jsonSerializer, 'JSON serializer should load');
@@ -70,15 +91,9 @@ suite('Export Integration Test Suite', () => {
             assert.ok(geometries.length > 0, 'Should generate geometries');
             
             // Step 2: Convert to JSCAD modeling objects
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             const modeling = extensionRequire('@jscad/modeling');
-            
-            const jscadGeometries = geometries.map(serialized => {
-                if (serialized.type === 'geom3') {
-                    return modeling.geometries.geom3.create(serialized.polygons);
-                }
-                return serialized;
-            });
+            const jscadGeometries = convertGeometries(geometries, modeling);
             
             // Step 3: Serialize to STL binary
             const stlSerializer = extensionRequire('@jscad/stl-serializer');
@@ -94,15 +109,9 @@ suite('Export Integration Test Suite', () => {
             
             const geometries = await executeJscadFile(filePath, mockOutputChannel);
             
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             const modeling = extensionRequire('@jscad/modeling');
-            
-            const jscadGeometries = geometries.map(serialized => {
-                if (serialized.type === 'geom3') {
-                    return modeling.geometries.geom3.create(serialized.polygons);
-                }
-                return serialized;
-            });
+            const jscadGeometries = convertGeometries(geometries, modeling);
             
             const stlSerializer = extensionRequire('@jscad/stl-serializer');
             const stlData = stlSerializer.serialize({ binary: false }, ...jscadGeometries);
@@ -118,15 +127,9 @@ suite('Export Integration Test Suite', () => {
             
             const geometries = await executeJscadFile(filePath, mockOutputChannel);
             
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             const modeling = extensionRequire('@jscad/modeling');
-            
-            const jscadGeometries = geometries.map(serialized => {
-                if (serialized.type === 'geom3') {
-                    return modeling.geometries.geom3.create(serialized.polygons);
-                }
-                return serialized;
-            });
+            const jscadGeometries = convertGeometries(geometries, modeling);
             
             const objSerializer = extensionRequire('@jscad/obj-serializer');
             const objData = objSerializer.serialize({ triangulate: true }, ...jscadGeometries);
@@ -143,15 +146,9 @@ suite('Export Integration Test Suite', () => {
             
             const geometries = await executeJscadFile(filePath, mockOutputChannel);
             
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             const modeling = extensionRequire('@jscad/modeling');
-            
-            const jscadGeometries = geometries.map(serialized => {
-                if (serialized.type === 'geom3') {
-                    return modeling.geometries.geom3.create(serialized.polygons);
-                }
-                return serialized;
-            });
+            const jscadGeometries = convertGeometries(geometries, modeling);
             
             const jsonSerializer = extensionRequire('@jscad/json-serializer');
             const jsonData = jsonSerializer.serialize({}, ...jscadGeometries);
@@ -171,17 +168,9 @@ suite('Export Integration Test Suite', () => {
             
             const geometries = await executeJscadFile(filePath, mockOutputChannel);
             
-            const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+            const extensionRequire = getExtensionRequire();
             const modeling = extensionRequire('@jscad/modeling');
-            
-            const jscadGeometries = geometries.map(serialized => {
-                if (serialized.type === 'geom2') {
-                    return modeling.geometries.geom2.create(serialized.sides);
-                } else if (serialized.type === 'geom3') {
-                    return modeling.geometries.geom3.create(serialized.polygons);
-                }
-                return serialized;
-            });
+            const jscadGeometries = convertGeometries(geometries, modeling);
             
             // Filter to only 2D geometries for SVG
             const geom2Objects = jscadGeometries.filter(g => 
@@ -207,15 +196,9 @@ suite('Export Integration Test Suite', () => {
                 // Execute and serialize
                 const geometries = await executeJscadFile(filePath, mockOutputChannel);
                 
-                const extensionRequire = createRequire(path.join(__dirname, '../../../package.json'));
+                const extensionRequire = getExtensionRequire();
                 const modeling = extensionRequire('@jscad/modeling');
-                
-                const jscadGeometries = geometries.map(serialized => {
-                    if (serialized.type === 'geom3') {
-                        return modeling.geometries.geom3.create(serialized.polygons);
-                    }
-                    return serialized;
-                });
+                const jscadGeometries = convertGeometries(geometries, modeling);
                 
                 const stlSerializer = extensionRequire('@jscad/stl-serializer');
                 const stlData = stlSerializer.serialize({ binary: false }, ...jscadGeometries);
