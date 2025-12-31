@@ -284,10 +284,9 @@ async function performExport(
                 lastProgressValue = 30;
                 progress.report({ increment: 30, message: 'Serializing...' });
 
-                // Dynamically load the serializer
-                // Use eval to get real Node.js require (same approach as jscadEngine.ts)
+                // Dynamically load the serializer using the same pattern as jscadEngine.ts
                 const nodeRequire = eval('require');
-                const extensionRequire = createRequire(nodeRequire.resolve('@jscad/modeling'));
+                const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
                 const serializer = extensionRequire(format.serializerPackage);
 
                 // Convert serialized geometries back to JSCAD modeling objects
