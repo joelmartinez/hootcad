@@ -37,14 +37,20 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "Current version: $CURRENT_VERSION"
           
-          # Extract major and minor version
-          MAJOR_MINOR=$(echo $CURRENT_VERSION | \
-            sed -E 's/^([0-9]+\.[0-9]+)\.[0-9]+$/\1/')
+          # Extract major and minor version using Node.js
+          MAJOR_MINOR=$(node -pe "
+            const v = require('./package.json').version;
+            const parts = v.split('.');
+            if (parts.length !== 3 || !parts.every(p => /^\d+$/.test(p))) {
+              process.exit(1);
+            }
+            parts[0] + '.' + parts[1];
+          ")
           
-          # Validate that extraction was successful
-          if [ -z "$MAJOR_MINOR" ] || [ "$MAJOR_MINOR" = "$CURRENT_VERSION" ]; then
-            echo "Error: Failed to extract major.minor version from $CURRENT_VERSION"
-            echo "Version must be in format: X.Y.Z (e.g., 0.0.1 or 1.3.0)"
+          # Check if extraction was successful
+          if [ $? -ne 0 ]; then
+            echo "Error: Version must be in format X.Y.Z (e.g., 0.0.1 or 1.3.0)"
+            echo "Current version '$CURRENT_VERSION' is not valid"
             exit 1
           fi
           
