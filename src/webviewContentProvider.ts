@@ -397,7 +397,6 @@ export class WebviewContentProvider {
 			
 			const axesHelper = new THREE.AxesHelper(100);
 			scene.add(axesHelper);
-		scene.add(axesHelper);
 			
 			// Add mesh group
 			scene.add(meshGroup);

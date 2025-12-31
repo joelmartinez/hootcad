@@ -12,6 +12,13 @@ export class ErrorReporter {
 	}
 
 	/**
+	 * Get the output channel for direct access when needed
+	 */
+	getOutputChannel(): vscode.OutputChannel {
+		return this.outputChannel;
+	}
+
+	/**
 	 * Log an info message to the output channel
 	 */
 	logInfo(message: string): void {

@@ -133,14 +133,14 @@ export class WebviewManager {
 			this.statusBarItem.text = "HootCAD: Executing...";
 
 			// Get parameter definitions
-			const definitions = await getParameterDefinitions(filePath, this.errorReporter['outputChannel']);
+			const definitions = await getParameterDefinitions(filePath, this.errorReporter.getOutputChannel());
 
 			// Get merged parameters (defaults + cached values)
 			const params = this.parameterCache.getMergedParameters(filePath, definitions);
 			lastParams = params;
 
 			// Execute with parameters
-			const entities = await executeJscadFile(filePath, this.errorReporter['outputChannel'], params);
+			const entities = await executeJscadFile(filePath, this.errorReporter.getOutputChannel(), params);
 
 			if (this.currentPanel) {
 				// Send both entities and parameter UI data to webview
