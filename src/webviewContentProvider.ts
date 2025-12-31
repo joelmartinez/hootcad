@@ -163,6 +163,30 @@ const collapseButton = document.getElementById('collapse-button');
 let scene, camera, renderer, controls;
 let meshGroup = new THREE.Group();
 let animationFrameId = null;
+let hasRenderedOnce = false; // Track if we've done initial render with auto-zoom
+let userHasInteracted = false; // Track if user has moved camera
+
+// Manual orbit-control state (shared by auto-fit + user input)
+let cameraTarget = new THREE.Vector3(0, 0, 0);
+let cameraRotation = { theta: Math.PI / 4, phi: Math.PI / 4 };
+let cameraDistance = 50;
+
+function updateCameraPosition() {
+	const sinPhi = Math.sin(cameraRotation.phi);
+	camera.position.x = cameraTarget.x + cameraDistance * sinPhi * Math.cos(cameraRotation.theta);
+	camera.position.y = cameraTarget.y + cameraDistance * Math.cos(cameraRotation.phi);
+	camera.position.z = cameraTarget.z + cameraDistance * sinPhi * Math.sin(cameraRotation.theta);
+	camera.lookAt(cameraTarget);
+}
+
+function syncControlsFromCamera() {
+	const offset = new THREE.Vector3().subVectors(camera.position, cameraTarget);
+	cameraDistance = offset.length();
+	if (cameraDistance < 1e-6) return;
+	cameraRotation.theta = Math.atan2(offset.z, offset.x);
+	const cosPhi = offset.y / cameraDistance;
+	cameraRotation.phi = Math.acos(Math.max(-1, Math.min(1, cosPhi)));
+}
 
 // Initialize Three.js
 function initThreeJS() {
@@ -174,7 +198,10 @@ scene.background = new THREE.Color(0xf5f5f5); // Near-white background
 const aspect = canvas.clientWidth / canvas.clientHeight;
 camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
 camera.position.set(30, 30, 30);
-camera.lookAt(0, 0, 0);
+
+cameraTarget.set(0, 0, 0);
+camera.lookAt(cameraTarget);
+syncControlsFromCamera();
 
 // Renderer
 renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -239,11 +266,10 @@ loadingElement.style.display = 'none';
 function setupControls() {
 let isDragging = false;
 let previousMousePosition = { x: 0, y: 0 };
-let cameraRotation = { theta: Math.PI / 4, phi: Math.PI / 4 };
-let cameraDistance = 50;
 
 canvas.addEventListener('mousedown', (e) => {
 isDragging = true;
+userHasInteracted = true; // Mark that user has interacted
 previousMousePosition = { x: e.clientX, y: e.clientY };
 });
 
@@ -253,7 +279,7 @@ if (!isDragging) return;
 const deltaX = e.clientX - previousMousePosition.x;
 const deltaY = e.clientY - previousMousePosition.y;
 
-cameraRotation.theta -= deltaX * 0.01;
+cameraRotation.theta += deltaX * 0.01;
 cameraRotation.phi -= deltaY * 0.01;
 cameraRotation.phi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraRotation.phi));
 
@@ -272,17 +298,11 @@ isDragging = false;
 
 canvas.addEventListener('wheel', (e) => {
 e.preventDefault();
+userHasInteracted = true; // Mark that user has interacted
 cameraDistance += e.deltaY * 0.05;
 cameraDistance = Math.max(5, Math.min(200, cameraDistance));
 updateCameraPosition();
 });
-
-function updateCameraPosition() {
-camera.position.x = cameraDistance * Math.sin(cameraRotation.phi) * Math.cos(cameraRotation.theta);
-camera.position.y = cameraDistance * Math.cos(cameraRotation.phi);
-camera.position.z = cameraDistance * Math.sin(cameraRotation.phi) * Math.sin(cameraRotation.theta);
-camera.lookAt(0, 0, 0);
-}
 }
 
 function onWindowResize() {
@@ -314,6 +334,62 @@ meshGroup.remove(child);
 if (child.geometry) child.geometry.dispose();
 if (child.material) child.material.dispose();
 }
+}
+
+function fitCameraToObjects() {
+	// Calculate bounding box of all objects in the mesh group
+	const box = new THREE.Box3();
+	
+	if (meshGroup.children.length === 0) {
+		console.log('No objects to fit camera to');
+		return;
+	}
+
+	// Ensure world matrices are up-to-date before computing bounds
+	meshGroup.updateMatrixWorld(true);
+	
+	// Expand box to include all objects
+	meshGroup.children.forEach(child => {
+		const childBox = new THREE.Box3().setFromObject(child);
+		box.union(childBox);
+	});
+	
+	// Get the center and size of the bounding box
+	const center = new THREE.Vector3();
+	const size = new THREE.Vector3();
+	box.getCenter(center);
+	box.getSize(size);
+	
+	// Calculate the maximum dimension
+	const maxDim = Math.max(size.x, size.y, size.z);
+	
+	// If objects are too small, use a minimum size
+	const minSize = 10;
+	const effectiveSize = Math.max(maxDim, minSize);
+	
+	// Calculate distance needed to fit the object in view
+	// Use field of view to determine how far back the camera needs to be
+	const fov = camera.fov * (Math.PI / 180); // Convert to radians
+	const distance = effectiveSize / (2 * Math.tan(fov / 2));
+	
+	// Add some padding (1.5x distance for comfortable view)
+	const paddedDistance = distance * 1.5;
+	
+	// Update shared orbit state so the first user interaction doesn't "snap" the camera.
+	cameraTarget.copy(center);
+	cameraDistance = paddedDistance;
+	// Default to 45-45 degrees view for initial fit.
+	cameraRotation.theta = Math.PI / 4;
+	cameraRotation.phi = Math.PI / 4;
+	updateCameraPosition();
+	
+	console.log('Camera fitted to objects:', {
+		center: center,
+		size: size,
+		maxDim: maxDim,
+		distance: paddedDistance,
+		cameraPos: camera.position
+	});
 }
 
 function renderGeometries(geometries) {
@@ -383,7 +459,14 @@ console.error('Error converting geometry:', error);
 }
 }
 
-statusElement.textContent = \`Status: Rendered \${geometries.length} object(s)\`;
+statusElement.textContent = 'Status: Rendered ' + geometries.length + ' object(s)';
+
+// Auto-zoom to fit all objects, but only on the first render and if user hasn't interacted
+if (!hasRenderedOnce && !userHasInteracted) {
+	console.log('Performing initial auto-zoom to fit objects');
+	fitCameraToObjects();
+	hasRenderedOnce = true;
+}
 }
 
 function showError(message) {
@@ -407,15 +490,20 @@ window.addEventListener('message', (event) => {
 const message = event.data;
 switch (message.type) {
 case 'renderEntities':
-hideError();
-renderGeometries(message.entities);
-if (message.parameters) {
-updateParameterUI(message.parameters, parameterPanel, parameterContent, vscode);
-}
-break;
+	hideError();
+	renderGeometries(message.entities);
+	if (message.parameters) {
+		updateParameterUI(message.parameters, parameterPanel, parameterContent, vscode);
+	}
+	break;
 case 'error':
-showError(message.message);
-break;
+	showError(message.message);
+	break;
+case 'resetView':
+	// Allow manual reset of view - useful for debugging or user request
+	hasRenderedOnce = false;
+	userHasInteracted = false;
+	break;
 }
 });
 
@@ -425,5 +513,6 @@ initThreeJS();
 // Signal ready
 vscode.postMessage({ type: 'ready' });
 `;
+	}
 }
-}
+
