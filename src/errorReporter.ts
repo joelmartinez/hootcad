@@ -71,7 +71,7 @@ export class ErrorReporter {
 	/**
 	 * Extract error message from unknown error type
 	 */
-	private getErrorMessage(error: unknown): string {
+	getErrorMessage(error: unknown): string {
 		if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
 			return (error as any).message;
 		}
@@ -81,7 +81,7 @@ export class ErrorReporter {
 	/**
 	 * Extract stack trace from error if available
 	 */
-	private getErrorStack(error: unknown): string | undefined {
+	getErrorStack(error: unknown): string | undefined {
 		if (error && typeof error === 'object' && 'stack' in error && typeof (error as any).stack === 'string') {
 			return (error as any).stack;
 		}

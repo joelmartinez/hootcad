@@ -166,12 +166,9 @@ export class WebviewManager {
 			this.statusBarItem.text = "HootCAD: Error";
 
 			if (this.currentPanel) {
-				const errorMsg = error && typeof error === 'object' && 'message' in error 
-					? (error as any).message 
-					: String(error);
 				this.currentPanel.webview.postMessage({
 					type: 'error',
-					message: errorMsg
+					message: this.errorReporter.getErrorMessage(error)
 				});
 			}
 		}
