@@ -10,6 +10,7 @@ import { extractFilename, formatPreviewTitle } from './utilities';
  */
 export class WebviewManager {
 	private currentPanel: vscode.WebviewPanel | undefined;
+	private currentEntrypoint: string | undefined;
 	private context: vscode.ExtensionContext;
 	private errorReporter: ErrorReporter;
 	private contentProvider: WebviewContentProvider;
@@ -44,6 +45,9 @@ export class WebviewManager {
 		}
 
 		this.errorReporter.logInfo(`Resolved entrypoint: ${entrypoint.filePath} (source: ${entrypoint.source})`);
+
+		// Store the entrypoint
+		this.currentEntrypoint = entrypoint.filePath;
 
 		// Format the preview window title
 		const title = formatPreviewTitle(entrypoint.filePath);
@@ -88,6 +92,7 @@ export class WebviewManager {
 		this.currentPanel.onDidDispose(
 			() => {
 				this.currentPanel = undefined;
+				this.currentEntrypoint = undefined;
 				this.errorReporter.logInfo('Preview panel closed');
 			},
 			null,
@@ -108,10 +113,12 @@ export class WebviewManager {
 				return;
 			case 'ready':
 				this.errorReporter.logInfo('Webview is ready');
-				// Execute and render the JSCAD file
-				const entrypoint = resolveJscadEntrypoint();
-				if (entrypoint) {
-					await this.executeAndRender(entrypoint.filePath);
+				// Execute and render the stored entrypoint
+				if (this.currentEntrypoint) {
+					this.errorReporter.logInfo(`Executing from ready handler: ${this.currentEntrypoint}`);
+					await this.executeAndRender(this.currentEntrypoint);
+				} else {
+					this.errorReporter.logInfo('No entrypoint stored in ready handler');
 				}
 				return;
 			case 'parameterChanged':
