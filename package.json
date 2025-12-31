@@ -2,7 +2,7 @@
   "name": "hootcad",
   "displayName": "HootCAD",
   "description": "VS Code extension to view JSCAD files",
-  "version": "0.0.1",
+  "version": "0.1.1",
   "publisher": "hootcad",
   "repository": {
     "type": "git",
