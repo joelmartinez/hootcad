@@ -180,4 +180,38 @@ suite('Parameter Cache Test Suite', () => {
         const merged = cache.getMergedParameters(filePath, definitions);
         assert.deepStrictEqual(merged.sphereColor, [0, 1, 0, 1]);
     });
+
+    test('Should coerce comma-separated RGBA strings (normalized)', () => {
+        const filePath = '/test/color-file-3.jscad';
+        const definitions: ParameterDefinition[] = [
+            { name: 'sphereColor', type: 'color', initial: '#ff5555' }
+        ];
+        // Simulate user entering comma-separated values in 0-1 range
+        cache.set(filePath, { sphereColor: '0.2196078431372549,0.6980392156862745,0.20098039215686274,1' });
+
+        const merged = cache.getMergedParameters(filePath, definitions);
+        assert.ok(Array.isArray(merged.sphereColor), 'Color should be an array');
+        assert.strictEqual(merged.sphereColor.length, 4, 'Color should be RGBA');
+        assert.ok(Math.abs(merged.sphereColor[0] - 0.2196078431372549) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[1] - 0.6980392156862745) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[2] - 0.20098039215686274) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[3] - 1) < 1e-9);
+    });
+
+    test('Should coerce comma-separated RGBA strings (0-255 range)', () => {
+        const filePath = '/test/color-file-4.jscad';
+        const definitions: ParameterDefinition[] = [
+            { name: 'sphereColor', type: 'color', initial: '#ff5555' }
+        ];
+        // Simulate user entering comma-separated values in 0-255 range
+        cache.set(filePath, { sphereColor: '56,178,51,255' });
+
+        const merged = cache.getMergedParameters(filePath, definitions);
+        assert.ok(Array.isArray(merged.sphereColor), 'Color should be an array');
+        assert.strictEqual(merged.sphereColor.length, 4, 'Color should be RGBA');
+        assert.ok(Math.abs(merged.sphereColor[0] - 56/255) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[1] - 178/255) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[2] - 51/255) < 1e-9);
+        assert.ok(Math.abs(merged.sphereColor[3] - 1) < 1e-9);
+    });
 });

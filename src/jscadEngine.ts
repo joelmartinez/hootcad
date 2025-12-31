@@ -210,72 +210,45 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
         // Ensure result is an array
         const geometries = Array.isArray(result) ? result : [result];
         
-        // Import entitiesFromSolids at runtime using native require
-        const { entitiesFromSolids } = extensionRequire('@jscad/regl-renderer');
+        outputChannel.appendLine(`Executed JSCAD main() - returned ${geometries.length} geometry object(s)`);
         
-        // Log what the geometries look like
-        outputChannel.appendLine(`Raw geometries (${geometries.length}):`);
-        geometries.forEach((geom: any, i: number) => {
-            outputChannel.appendLine(`  [${i}] type: ${typeof geom}, keys: ${Object.keys(geom).join(', ')}`);
-            if (geom.polygons) {
-                outputChannel.appendLine(`      polygons: ${geom.polygons.length}`);
-            }
-            if (geom.sides) {
-                outputChannel.appendLine(`      sides: ${geom.sides}`);
-            }
-        });
-        
-        // Convert geometries to renderer entities
-        // This handles geometry type detection (2D vs 3D) and assigns proper draw commands
-        const entities = entitiesFromSolids({}, ...geometries);
-        
-        outputChannel.appendLine(`Converted ${geometries.length} geometry object(s) to ${entities.length} render entit${entities.length === 1 ? 'y' : 'ies'}`);
-        
-        // Log what the entities look like
-        entities.forEach((entity: any, i: number) => {
-            outputChannel.appendLine(`  Entity[${i}]: geometry.type=${entity.geometry?.type}, positions=${entity.geometry?.positions?.length || 'none'}, normals=${entity.geometry?.normals?.length || 'none'}, indices=${entity.geometry?.indices?.length || 'none'}`);
-            if (entity.geometry?.positions) {
-                outputChannel.appendLine(`    First 12 positions: ${Array.from(entity.geometry.positions.slice(0, 12)).join(', ')}`);
-            }
-            if (entity.geometry?.indices) {
-                outputChannel.appendLine(`    All indices: ${Array.from(entity.geometry.indices).join(', ')}`);
-            }
-        });
-        
-        // Serialize entities for webview (convert typed arrays to regular arrays)
-        const serializedEntities = entities.map((entity: any) => {
-            const serialized: any = {
-                visuals: entity.visuals,
-                geometry: {
-                    type: entity.geometry.type,
-                    isTransparent: entity.geometry.isTransparent
-                }
-            };
+        // Serialize geometries for webview
+        // We return raw JSCAD geometries (geom3/geom2) and let the webview handle conversion to Three.js
+        const serializedGeometries = geometries.map((geom: any, i: number) => {
+            // Detect geometry type
+            const hasPolygons = geom && Array.isArray(geom.polygons);
+            const hasSides = geom && Array.isArray(geom.sides);
             
-            // Convert typed arrays to regular arrays for JSON serialization
-            if (entity.geometry.positions) {
-                serialized.geometry.positions = Array.from(entity.geometry.positions);
+            if (hasPolygons) {
+                // geom3 (3D solid)
+                outputChannel.appendLine(`  [${i}] geom3 with ${geom.polygons.length} polygons`);
+                
+                return {
+                    type: 'geom3',
+                    polygons: geom.polygons,
+                    transforms: geom.transforms,
+                    color: geom.color
+                };
+            } else if (hasSides) {
+                // geom2 (2D path)
+                outputChannel.appendLine(`  [${i}] geom2 with ${geom.sides.length} sides`);
+                
+                return {
+                    type: 'geom2',
+                    sides: geom.sides,
+                    transforms: geom.transforms,
+                    color: geom.color
+                };
+            } else {
+                outputChannel.appendLine(`  [${i}] Unknown geometry type - keys: ${Object.keys(geom).join(', ')}`);
+                return {
+                    type: 'unknown',
+                    data: geom
+                };
             }
-            if (entity.geometry.normals) {
-                serialized.geometry.normals = Array.from(entity.geometry.normals);
-            }
-            if (entity.geometry.indices) {
-                serialized.geometry.indices = Array.from(entity.geometry.indices);
-            }
-            if (entity.geometry.colors) {
-                serialized.geometry.colors = Array.from(entity.geometry.colors);
-            }
-            if (entity.geometry.transforms) {
-                serialized.geometry.transforms = Array.from(entity.geometry.transforms);
-            }
-            if (entity.geometry.points) {
-                serialized.geometry.points = Array.from(entity.geometry.points);
-            }
-            
-            return serialized;
         });
         
-        return serializedEntities;
+        return serializedGeometries;
     } catch (error) {
         const errorMessage = getErrorMessage(error);
         outputChannel.appendLine(`Error executing JSCAD file: ${errorMessage}`);

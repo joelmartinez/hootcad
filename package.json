@@ -74,6 +74,7 @@
   },
   "dependencies": {
     "@jscad/modeling": "^2.12.6",
-    "@jscad/regl-renderer": "^2.6.13"
+    "@types/three": "^0.182.0",
+    "three": "^0.182.0"
   }
 }
