@@ -141,6 +141,39 @@ The `examples/` directory contains sample files:
 - `sphere.jscad` - Sphere
 - `snowman.jscad` - Complex model with multiple primitives
 
+## CI/CD and Releases
+
+This project uses GitHub Actions for continuous integration and automated releases.
+
+### Versioning
+
+The extension uses semantic versioning with automatic patch version updates:
+
+- **Version Format**: `MAJOR.MINOR.PATCH`
+- **Source**: The `version` field in `package.json` defines the MAJOR.MINOR version
+- **Automatic Patch**: On pushes to the `main` branch, the PATCH number is automatically set to the GitHub Actions run number
+
+**Examples:**
+- If `package.json` has `"version": "0.0.1"` and the GitHub Actions run number is 43, the published version will be `0.0.43`
+- If `package.json` has `"version": "1.3.0"` and the run number is 43, the published version will be `1.3.43`
+
+### Automated Releases
+
+On every push to the `main` branch:
+1. The extension is built and tested
+2. The version is automatically updated with the run number
+3. A `.vsix` package is created
+4. A GitHub release is created with the versioned tag (e.g., `v0.0.43`)
+5. The `.vsix` file is attached to the release
+
+### Manual Installation from Releases
+
+To install a specific release:
+1. Go to the [Releases page](https://github.com/joelmartinez/hootcad/releases)
+2. Download the `.vsix` file from the desired release
+3. In VS Code, press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+4. Type "Extensions: Install from VSIX..." and select the downloaded file
+
 ## Project Structure
 
 - `src/extension.ts` - Main extension code and webview management
