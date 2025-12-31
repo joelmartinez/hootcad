@@ -285,9 +285,18 @@ async function performExport(
                 progress.report({ increment: 30, message: 'Serializing...' });
 
                 // Dynamically load the serializer using the same pattern as jscadEngine.ts
-                const nodeRequire = eval('require');
                 const extensionRequire = createRequire(path.join(__dirname, '..', 'package.json'));
-                const serializer = extensionRequire(format.serializerPackage);
+                let serializer: any;
+                try {
+                    serializer = extensionRequire(format.serializerPackage);
+                } catch (loadError) {
+                    throw new Error(
+                        `Cannot load export serializer '${format.serializerPackage}'. ` +
+                        `If you're developing locally, run 'npm install' in the extension folder. ` +
+                        `If this is an installed VSIX/Marketplace extension, it may be missing bundled dependencies.`,
+                        { cause: loadError }
+                    );
+                }
 
                 // Convert serialized geometries back to JSCAD modeling objects
                 const modeling = extensionRequire('@jscad/modeling');
@@ -328,6 +337,9 @@ async function performExport(
                     if (typeof content === 'string') {
                         // Text format (STL ASCII, OBJ, SVG, DXF, JSON, X3D)
                         fs.writeFileSync(targetFilePath, content, 'utf8');
+                    } else if (content instanceof ArrayBuffer) {
+                        // Binary formats often return ArrayBuffer
+                        fs.writeFileSync(targetFilePath, Buffer.from(content));
                     } else if (content instanceof Uint8Array || Buffer.isBuffer(content)) {
                         // Binary format (STL binary)
                         fs.writeFileSync(targetFilePath, content);

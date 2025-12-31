@@ -41,7 +41,32 @@ suite('Export Integration Test Suite', () => {
      * Helper to get extension require
      */
     const getExtensionRequire = () => {
-        return createRequire(path.join(__dirname, '../../../package.json'));
+        // Walk up from the compiled test location until we find this extension's package.json.
+        // (The test runner's working directory can vary, so relative paths can accidentally
+        // land on an unrelated parent folder's package.json.)
+        let currentDir = __dirname;
+        for (let i = 0; i < 8; i++) {
+            const candidate = path.join(currentDir, 'package.json');
+            if (fs.existsSync(candidate)) {
+                try {
+                    const pkg = JSON.parse(fs.readFileSync(candidate, 'utf8'));
+                    if (pkg?.name === 'hootcad') {
+                        return createRequire(candidate);
+                    }
+                } catch {
+                    // Ignore invalid package.json and keep walking
+                }
+            }
+            const parentDir = path.dirname(currentDir);
+            if (parentDir === currentDir) {
+                break;
+            }
+            currentDir = parentDir;
+        }
+
+        // Fallback to the historical relative path (kept for readability when it works).
+        const fallback = path.resolve(__dirname, '../../../package.json');
+        return createRequire(fallback);
     };
     
     suite('JSCAD Serializer Integration', () => {
@@ -101,7 +126,10 @@ suite('Export Integration Test Suite', () => {
             
             assert.ok(Array.isArray(stlData), 'Should return array');
             assert.ok(stlData.length > 0, 'Should return data');
-            assert.ok(stlData[0] instanceof Uint8Array || Buffer.isBuffer(stlData[0]), 'Binary STL should be Uint8Array or Buffer');
+            assert.ok(
+                stlData[0] instanceof ArrayBuffer || stlData[0] instanceof Uint8Array || Buffer.isBuffer(stlData[0]),
+                'Binary STL should be ArrayBuffer, Uint8Array, or Buffer'
+            );
         });
         
         test('Can execute JSCAD and serialize to STL ASCII', async () => {
