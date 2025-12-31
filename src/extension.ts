@@ -587,8 +587,16 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 			// Basic orbit controls (manual implementation)
 			setupControls();
 			
-			// Handle window resize
-			window.addEventListener('resize', onWindowResize);
+			// Handle window resize using ResizeObserver
+			// Watch the canvas-container instead of the canvas itself
+			const container = document.getElementById('canvas-container');
+			const resizeObserver = new ResizeObserver((entries) => {
+				for (const entry of entries) {
+					console.log('ResizeObserver triggered:', entry.contentRect.width, 'x', entry.contentRect.height);
+					onWindowResize();
+				}
+			});
+			resizeObserver.observe(container);
 			
 			// Start render loop
 			animate();
@@ -648,9 +656,20 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 		}
 		
 		function onWindowResize() {
-			camera.aspect = canvas.clientWidth / canvas.clientHeight;
+			const container = document.getElementById('canvas-container');
+			const width = container.clientWidth;
+			const height = container.clientHeight;
+			console.log('Resize detected:', width, 'x', height);
+			
+			// Update camera aspect ratio
+			camera.aspect = width / height;
 			camera.updateProjectionMatrix();
-			renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+			
+			// Update renderer size - this updates the canvas drawing buffer
+			renderer.setSize(width, height);
+			
+			// Ensure pixel ratio is maintained
+			renderer.setPixelRatio(window.devicePixelRatio);
 		}
 		
 		function animate() {
