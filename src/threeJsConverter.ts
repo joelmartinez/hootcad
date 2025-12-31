@@ -22,6 +22,7 @@ export interface Polygon {
 export interface Geom3 {
     polygons: Polygon[];
     transforms?: number[]; // 4x4 matrix as flat array
+    color?: number[]; // [r, g, b, a] in 0-1 range
 }
 
 /**
@@ -30,6 +31,7 @@ export interface Geom3 {
 export interface Geom2 {
     sides: number[][][]; // Array of [[x,y], [x,y]] line segments
     transforms?: number[];
+    color?: number[]; // [r, g, b, a] in 0-1 range
 }
 
 /**
@@ -40,6 +42,7 @@ export interface BufferGeometryData {
     normals?: Float32Array;
     indices?: Uint16Array | Uint32Array;
     transforms?: number[];
+    color?: number[]; // [r, g, b, a] in 0-1 range
 }
 
 /**
@@ -143,7 +146,8 @@ export function convertGeom3ToBufferGeometry(geom3: Geom3): BufferGeometryData {
     return {
         positions: new Float32Array(positions),
         normals: new Float32Array(normals),
-        transforms: geom3.transforms
+        transforms: geom3.transforms,
+        color: geom3.color
     };
 }
 
@@ -168,7 +172,8 @@ export function convertGeom2ToLineGeometry(geom2: Geom2): BufferGeometryData {
     
     return {
         positions: new Float32Array(positions),
-        transforms: geom2.transforms
+        transforms: geom2.transforms,
+        color: geom2.color
     };
 }
 

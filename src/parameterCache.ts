@@ -63,8 +63,21 @@ export class ParameterCache {
                 return value;
             }
 
-            const hex = value.trim();
-            const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(hex);
+            const trimmed = value.trim();
+
+            // Handle comma-separated RGBA strings (e.g., "0.5,0.2,0.8,1" or "128,64,200,255")
+            if (trimmed.includes(',')) {
+                const parts = trimmed.split(',').map(s => parseFloat(s.trim()));
+                if (parts.every(v => Number.isFinite(v)) && (parts.length === 3 || parts.length === 4)) {
+                    const needsNormalize = parts.some(v => v > 1);
+                    const normalized = needsNormalize ? parts.map(v => v / 255) : parts;
+                    const rgba = normalized.length === 3 ? [...normalized, 1] : normalized;
+                    return rgba;
+                }
+            }
+
+            // Handle hex color strings
+            const match = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.exec(trimmed);
             if (!match) {
                 return value;
             }

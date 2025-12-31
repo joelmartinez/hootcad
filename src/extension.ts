@@ -663,19 +663,57 @@ function getWebviewContent(context: vscode.ExtensionContext, webview: vscode.Web
 				try {
 					if (geom.type === 'geom3') {
 						const geometry = convertGeom3ToBufferGeometry(geom, THREE);
+						
+						// Determine color - use geom color if available, otherwise default blue
+						let color = 0x4488ff;
+						if (geom.color && Array.isArray(geom.color) && geom.color.length >= 3) {
+							// Convert from [r, g, b, a] (0-1) to hex color
+							const r = Math.round(geom.color[0] * 255);
+							const g = Math.round(geom.color[1] * 255);
+							const b = Math.round(geom.color[2] * 255);
+							color = (r << 16) | (g << 8) | b;
+						}
+						
 						const material = new THREE.MeshStandardMaterial({
-							color: 0x4488ff,
+							color: color,
 							metalness: 0.3,
 							roughness: 0.7,
 							side: THREE.DoubleSide
 						});
 						const mesh = new THREE.Mesh(geometry, material);
+						
+						// Apply transforms if available
+						if (geom.transforms && Array.isArray(geom.transforms) && geom.transforms.length === 16) {
+							// JSCAD uses column-major order, Three.js uses column-major too
+							const matrix = new THREE.Matrix4();
+							matrix.fromArray(geom.transforms);
+							matrix.decompose(mesh.position, mesh.quaternion, mesh.scale);
+						}
+						
 						meshGroup.add(mesh);
-						console.log('Added geom3 mesh');
+						console.log('Added geom3 mesh with color:', color.toString(16));
 					} else if (geom.type === 'geom2') {
 						const geometry = convertGeom2ToLineGeometry(geom, THREE);
-						const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+						
+						// Determine color - use geom color if available, otherwise default green
+						let color = 0x00ff00;
+						if (geom.color && Array.isArray(geom.color) && geom.color.length >= 3) {
+							const r = Math.round(geom.color[0] * 255);
+							const g = Math.round(geom.color[1] * 255);
+							const b = Math.round(geom.color[2] * 255);
+							color = (r << 16) | (g << 8) | b;
+						}
+						
+						const material = new THREE.LineBasicMaterial({ color: color });
 						const line = new THREE.LineSegments(geometry, material);
+						
+						// Apply transforms if available
+						if (geom.transforms && Array.isArray(geom.transforms) && geom.transforms.length === 16) {
+							const matrix = new THREE.Matrix4();
+							matrix.fromArray(geom.transforms);
+							matrix.decompose(line.position, line.quaternion, line.scale);
+						}
+						
 						meshGroup.add(line);
 						console.log('Added geom2 lines');
 					}

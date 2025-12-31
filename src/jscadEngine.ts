@@ -226,7 +226,8 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
                 return {
                     type: 'geom3',
                     polygons: geom.polygons,
-                    transforms: geom.transforms
+                    transforms: geom.transforms,
+                    color: geom.color
                 };
             } else if (hasSides) {
                 // geom2 (2D path)
@@ -235,7 +236,8 @@ export async function executeJscadFile(filePath: string, outputChannel: vscode.O
                 return {
                     type: 'geom2',
                     sides: geom.sides,
-                    transforms: geom.transforms
+                    transforms: geom.transforms,
+                    color: geom.color
                 };
             } else {
                 outputChannel.appendLine(`  [${i}] Unknown geometry type - keys: ${Object.keys(geom).join(', ')}`);
