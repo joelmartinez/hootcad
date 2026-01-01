@@ -101,6 +101,16 @@
 			roughness: 0.35
 		};
 
+		// Very subtle, screen-space tilt-shift (fake shallow DoF).
+		// Blur increases toward the top/bottom of the screen.
+		const TILT_SHIFT_PRESET = {
+			enabled: true,
+			focusY: 0.52,
+			focusWidth: 0.22,
+			feather: 0.22,
+			blurStrengthPx: 2.2
+		};
+
 		function clamp01(value) {
 			if (typeof value !== 'number' || Number.isNaN(value)) {
 				return 1;
@@ -127,6 +137,11 @@
 		let scene;
 		let camera;
 		let renderer;
+		let postScene;
+		let postCamera;
+		let postMaterial;
+		let postQuad;
+		let postTarget;
 		let meshGroup;
 		let floorMesh;
 		let floorMaterial;
@@ -224,6 +239,89 @@
 
 			// Ensure pixel ratio is maintained
 			renderer.setPixelRatio(window.devicePixelRatio);
+
+			updatePostProcessingSize();
+		}
+
+		function updatePostProcessingSize() {
+			if (!renderer || !postTarget || !postMaterial) {
+				return;
+			}
+			const size = new THREE.Vector2();
+			renderer.getDrawingBufferSize(size);
+			postTarget.setSize(size.x, size.y);
+			postMaterial.uniforms.resolution.value.set(size.x, size.y);
+		}
+
+		function initPostProcessing() {
+			if (!TILT_SHIFT_PRESET.enabled) {
+				return;
+			}
+
+			postTarget = new THREE.WebGLRenderTarget(1, 1, {
+				depthBuffer: true,
+				stencilBuffer: false
+			});
+
+			postScene = new THREE.Scene();
+			postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+			postMaterial = new THREE.ShaderMaterial({
+				uniforms: {
+					tDiffuse: { value: null },
+					resolution: { value: new THREE.Vector2(1, 1) },
+					focusY: { value: TILT_SHIFT_PRESET.focusY },
+					focusWidth: { value: TILT_SHIFT_PRESET.focusWidth },
+					feather: { value: TILT_SHIFT_PRESET.feather },
+					blurStrengthPx: { value: TILT_SHIFT_PRESET.blurStrengthPx }
+				},
+				vertexShader: `
+					varying vec2 vUv;
+					void main() {
+						vUv = uv;
+						gl_Position = vec4(position.xy, 0.0, 1.0);
+					}
+				`,
+				fragmentShader: `
+					precision highp float;
+					uniform sampler2D tDiffuse;
+					uniform vec2 resolution;
+					uniform float focusY;
+					uniform float focusWidth;
+					uniform float feather;
+					uniform float blurStrengthPx;
+					varying vec2 vUv;
+
+					float blurAmount(float y) {
+						float d = abs(y - focusY);
+						return smoothstep(focusWidth, focusWidth + feather, d);
+					}
+
+					void main() {
+						vec2 texel = 1.0 / resolution;
+						float amount = blurAmount(vUv.y);
+						float radius = amount * blurStrengthPx;
+
+						vec4 c = texture2D(tDiffuse, vUv) * 0.24;
+						c += texture2D(tDiffuse, vUv + vec2(texel.x * radius, 0.0)) * 0.14;
+						c += texture2D(tDiffuse, vUv - vec2(texel.x * radius, 0.0)) * 0.14;
+						c += texture2D(tDiffuse, vUv + vec2(0.0, texel.y * radius)) * 0.14;
+						c += texture2D(tDiffuse, vUv - vec2(0.0, texel.y * radius)) * 0.14;
+						c += texture2D(tDiffuse, vUv + vec2(texel.x * radius, texel.y * radius)) * 0.05;
+						c += texture2D(tDiffuse, vUv + vec2(-texel.x * radius, texel.y * radius)) * 0.05;
+						c += texture2D(tDiffuse, vUv + vec2(texel.x * radius, -texel.y * radius)) * 0.05;
+						c += texture2D(tDiffuse, vUv + vec2(-texel.x * radius, -texel.y * radius)) * 0.05;
+
+						gl_FragColor = c;
+					}
+				`
+			});
+			postMaterial.toneMapped = false;
+
+			postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial);
+			postScene.add(postQuad);
+
+			updatePostProcessingSize();
 		}
 
 		function animate() {
@@ -246,7 +344,15 @@
 				}
 			}
 
-			renderer.render(scene, camera);
+			if (TILT_SHIFT_PRESET.enabled && postTarget && postMaterial && postScene && postCamera) {
+				postMaterial.uniforms.tDiffuse.value = postTarget.texture;
+				renderer.setRenderTarget(postTarget);
+				renderer.render(scene, camera);
+				renderer.setRenderTarget(null);
+				renderer.render(postScene, postCamera);
+			} else {
+				renderer.render(scene, camera);
+			}
 		}
 
 		function clearScene() {
@@ -455,6 +561,8 @@
 			renderer.shadowMap.enabled = SHADOW_PRESET.enabled;
 			renderer.shadowMap.type =
 				SHADOW_PRESET.type === 'VSM' ? THREE.VSMShadowMap : THREE.PCFSoftShadowMap;
+
+			initPostProcessing();
 
 			const ambientLight = new THREE.AmbientLight(0xffffff, LIGHTING_PRESET.ambientIntensity);
 			scene.add(ambientLight);
