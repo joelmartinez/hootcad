@@ -142,6 +142,7 @@
 		let postMaterial;
 		let postQuad;
 		let postTarget;
+		let gridHelper;
 		let meshGroup;
 		let floorMesh;
 		let floorMaterial;
@@ -397,14 +398,21 @@
 			}
 			if (!bounds) {
 				floorMesh.visible = false;
+				if (gridHelper) {
+					gridHelper.position.y = 0;
+				}
 				return;
 			}
 
 			const { box } = bounds;
-			const offset = 0.01;
+			const floorOffset = 0.01;
+			const gridOffsetAboveFloor = 0.01;
 
 			floorMesh.visible = true;
-			floorMesh.position.y = box.min.y - offset;
+			floorMesh.position.y = box.min.y - floorOffset;
+			if (gridHelper) {
+				gridHelper.position.y = floorMesh.position.y + gridOffsetAboveFloor;
+			}
 			// Geometry vertices are rotated into the XZ plane, so scale X and Z.
 			floorMesh.scale.set(GRID_SIZE, 1, GRID_SIZE);
 			isFloorGhosted = false;
@@ -608,7 +616,7 @@
 			rimLight.position.set(0, 15, -45);
 			scene.add(rimLight);
 
-			const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x8899aa, 0xc5d0dd);
+			gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x8899aa, 0xc5d0dd);
 			scene.add(gridHelper);
 
 			const axesHelper = new THREE.AxesHelper(100);
