@@ -87,8 +87,10 @@
 			radius: 14,
 			// Used by VSM; ignored by PCF.
 			blurSamples: 32,
-			bias: -0.00006,
-			normalBias: 0.01,
+			// Tune to avoid banding/striping on large flat receivers (floor) while
+			// keeping contact shadows reasonably tight.
+			bias: -0.00025,
+			normalBias: 0.02,
 			// Default extent; we tighten this dynamically per model for better shadow quality.
 			cameraExtent: 120,
 			cameraNear: 0.5,
