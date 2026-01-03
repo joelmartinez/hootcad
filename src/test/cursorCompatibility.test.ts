@@ -61,12 +61,10 @@ suite('Cursor IDE Compatibility Test Suite', () => {
 	test('extension uses only standard VS Code APIs (no proprietary APIs)', () => {
 		const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 		
-		// Check that the extension doesn't have any Microsoft-specific dependencies
-		// that might not work in Cursor
 		const dependencies = packageJson.dependencies || {};
 		const devDependencies = packageJson.devDependencies || {};
 		
-		// These are the standard allowed dependencies
+		// These are the standard allowed development dependencies
 		const allowedVSCodeDeps = [
 			'@types/vscode',
 			'@vscode/test-cli',
@@ -74,23 +72,28 @@ suite('Cursor IDE Compatibility Test Suite', () => {
 			'@vscode/vsce'
 		];
 		
-		// Check dev dependencies
+		// Check dev dependencies - only validate if they're in our known list
 		for (const dep of Object.keys(devDependencies)) {
 			if (dep.startsWith('@vscode/') || dep.startsWith('vscode-')) {
 				assert.ok(
-					allowedVSCodeDeps.some(allowed => dep === allowed),
-					`Dependency ${dep} should be a standard VS Code dev dependency`
+					allowedVSCodeDeps.includes(dep),
+					`Dev dependency ${dep} should be in the standard VS Code dev dependency list. ` +
+					`If this is a new standard package, add it to the allowlist.`
 				);
 			}
 		}
 		
 		// Runtime dependencies should not include VS Code-specific packages
-		for (const dep of Object.keys(dependencies)) {
-			assert.ok(
-				!dep.startsWith('@vscode/') && !dep.startsWith('vscode-'),
-				`Runtime dependency ${dep} should not be VS Code-specific to ensure Cursor compatibility`
-			);
-		}
+		// This ensures the extension works in Cursor which may have different internals
+		const problematicDeps = Object.keys(dependencies).filter(dep => 
+			dep.startsWith('@vscode/') || dep.startsWith('vscode-')
+		);
+		assert.strictEqual(
+			problematicDeps.length, 
+			0,
+			`Runtime dependencies should not be VS Code-specific to ensure Cursor compatibility. ` +
+			`Found: ${problematicDeps.join(', ')}`
+		);
 	});
 
 	test('.cursorignore file exists', () => {
@@ -138,15 +141,33 @@ suite('Cursor IDE Compatibility Test Suite', () => {
 		const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 		const activationEvents = packageJson.activationEvents || [];
 		
-		// All activation events should be standard VS Code activation events
-		// that work in Cursor as well
+		// Standard activation event prefixes supported by both VS Code and Cursor
+		const standardEventPrefixes = [
+			'onLanguage:',
+			'onCommand:',
+			'onView:',
+			'onUri:',
+			'onFileSystem:',
+			'onWebviewPanel:',
+			'workspaceContains:',
+			'onStartupFinished',
+			'onDebug',
+			'onTaskType:',
+			'onCustomEditor:',
+			'onAuthenticationRequest:',
+			'onTerminalProfile:',
+			'*'  // Special case: activate on startup
+		];
+		
+		// All activation events should use standard prefixes
 		for (const event of activationEvents) {
+			const isStandard = standardEventPrefixes.some(prefix => 
+				event === prefix || event.startsWith(prefix)
+			);
 			assert.ok(
-				event.startsWith('onLanguage:') || 
-				event.startsWith('onCommand:') ||
-				event.startsWith('onView:') ||
-				event === '*',
-				`Activation event ${event} should be a standard event type`
+				isStandard,
+				`Activation event "${event}" should use a standard VS Code activation event prefix ` +
+				`to ensure compatibility with both VS Code and Cursor`
 			);
 		}
 	});
