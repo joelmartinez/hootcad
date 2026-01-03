@@ -1,7 +1,7 @@
 {
   "name": "hootcad",
   "displayName": "HootCAD",
-  "description": "VS Code extension to view JSCAD files",
+  "description": "VS Code and Cursor extension to view JSCAD files",
   "version": "0.1.1",
   "publisher": "hootcad",
   "repository": {
@@ -13,6 +13,15 @@
   },
   "categories": [
     "Other"
+  ],
+  "keywords": [
+    "jscad",
+    "3d",
+    "cad",
+    "modeling",
+    "preview",
+    "cursor",
+    "vscode"
   ],
   "activationEvents": [
     "onLanguage:jscad",

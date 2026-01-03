@@ -1,6 +1,8 @@
 # HootCAD
 
-VS Code extension to view and render JSCAD files in 3D
+VS Code and Cursor extension to view and render JSCAD files in 3D
+
+> **Works with both VS Code and Cursor IDE** - Install using the same extension package in either editor!
 
 ## Features
 
@@ -134,6 +136,10 @@ npm test
 
 ### Packaging and Installing Locally
 
+#### For VS Code and Cursor
+
+The same `.vsix` package works for both VS Code and Cursor IDE!
+
 1. Install `vsce` (VS Code Extension Manager):
    ```bash
    npm install -g @vscode/vsce
@@ -145,7 +151,9 @@ npm test
    ```
    This will create a file like `hootcad-0.0.1.vsix`
 
-3. Install the `.vsix` file in VS Code:
+3. Install the `.vsix` file:
+
+   **In VS Code:**
    - **Option 1: Using Command Palette**
      - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
      - Type "Extensions: Install from VSIX..."
@@ -156,7 +164,23 @@ npm test
      code --install-extension hootcad-0.0.1.vsix
      ```
 
-4. Reload VS Code to activate the extension
+   **In Cursor:**
+   - **Option 1: Using Command Palette**
+     - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+     - Type "Extensions: Install from VSIX..."
+     - Select the generated `.vsix` file
+   
+   - **Option 2: Using Command Line**
+     ```bash
+     cursor --install-extension hootcad-0.0.1.vsix
+     ```
+   
+   - **Option 3: Drag and Drop**
+     - Open Cursor
+     - Open the Extensions view (Ctrl+Shift+X / Cmd+Shift+X)
+     - Drag and drop the `.vsix` file into the Extensions view
+
+4. Reload VS Code or Cursor to activate the extension
 
 ### Debugging
 
@@ -208,13 +232,16 @@ On every push to the `main` branch:
 4. A GitHub release is created with the versioned tag (e.g., `v0.0.43`)
 5. The `.vsix` file is attached to the release
 
-### Manual Installation from Releases
+### Manual Installation from Releases (VS Code & Cursor)
+
+The same `.vsix` file works for both VS Code and Cursor IDE!
 
 To install a specific release:
 1. Go to the [Releases page](https://github.com/joelmartinez/hootcad/releases)
 2. Download the `.vsix` file from the desired release
-3. In VS Code, press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
-4. Type "Extensions: Install from VSIX..." and select the downloaded file
+3. Install in your editor:
+   - **VS Code**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac), type "Extensions: Install from VSIX..." and select the downloaded file
+   - **Cursor**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac), type "Extensions: Install from VSIX..." and select the downloaded file, or drag-and-drop the `.vsix` file into the Extensions view
 
 ## Project Structure
 
