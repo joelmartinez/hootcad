@@ -13,7 +13,7 @@ Cursor is a fork of VS Code that maintains high compatibility with VS Code exten
 ### Shared Architecture
 - **Cursor is a VS Code fork**: Cursor is built on the VS Code codebase, inheriting its extension API and architecture
 - **Same extension format**: Both use `.vsix` packages with identical structure
-- **Compatible APIs**: HootCAD uses VS Code API `^1.107.0`, which is supported by Cursor
+- **Compatible APIs**: HootCAD uses VS Code API `^1.95.0`, ensuring compatibility with Cursor versions 1.95.0 and higher
 
 ### No Cursor-Specific Code Needed
 HootCAD works in Cursor without any modifications because:
@@ -21,6 +21,18 @@ HootCAD works in Cursor without any modifications because:
 - No editor-specific APIs or features are used
 - The extension is self-contained with bundled dependencies
 - WebGL rendering works identically in both editors
+
+### Version Compatibility
+
+**Minimum Required Version**: VS Code API `^1.95.0`
+
+This ensures compatibility with:
+- ✅ VS Code 1.95.0 and higher
+- ✅ Cursor 1.95.0 and higher (including current versions based on VS Code 1.105.x)
+
+If you encounter an error like "not compatible with VS Code 'x.x.x'", ensure you're using:
+- VS Code version 1.95.0 or newer
+- Cursor version 1.95.0 or newer (or a version based on VS Code 1.95.0+)
 
 ## Installation in Cursor
 
@@ -118,7 +130,7 @@ When testing in Cursor:
 
 | Feature | VS Code API | Cursor Support |
 |---------|-------------|----------------|
-| Extension activation | ✅ `^1.107.0` | ✅ Compatible |
+| Extension activation | ✅ `^1.95.0` | ✅ Compatible |
 | Commands | ✅ `vscode.commands` | ✅ Compatible |
 | Webview | ✅ `vscode.window.createWebviewPanel` | ✅ Compatible |
 | File watchers | ✅ `vscode.workspace.onDidSaveTextDocument` | ✅ Compatible |
