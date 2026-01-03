@@ -228,9 +228,11 @@ The extension uses semantic versioning with automatic patch version updates:
 On every push to the `main` branch:
 1. The extension is built and tested
 2. The version is automatically updated with the run number
-3. A `.vsix` package is created
+3. A universal `.vsix` package is created (works for both VS Code and Cursor)
 4. A GitHub release is created with the versioned tag (e.g., `v0.0.43`)
 5. The `.vsix` file is attached to the release
+
+**Note**: The same `.vsix` package works for both VS Code and Cursor IDE - no separate builds needed!
 
 ### Manual Installation from Releases (VS Code & Cursor)
 
@@ -242,6 +244,22 @@ To install a specific release:
 3. Install in your editor:
    - **VS Code**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac), type "Extensions: Install from VSIX..." and select the downloaded file
    - **Cursor**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac), type "Extensions: Install from VSIX..." and select the downloaded file, or drag-and-drop the `.vsix` file into the Extensions view
+
+### Publishing to Extension Marketplaces
+
+For maximum distribution, the extension can be published to both marketplaces:
+
+#### VS Code Marketplace
+- Official Microsoft extension marketplace
+- Used by VS Code users by default
+- Publishing: `vsce publish`
+
+#### OpenVSX Registry (Cursor's Default)
+- Open-source, community-driven extension registry
+- Used by Cursor IDE and other VS Code derivatives
+- Publishing: `npx ovsx publish hootcad-x.x.x.vsix`
+
+**The same `.vsix` package works for both marketplaces!** See [CURSOR_COMPATIBILITY.md](./CURSOR_COMPATIBILITY.md) for detailed compatibility information.
 
 ## Project Structure
 
@@ -258,6 +276,7 @@ To install a specific release:
 This is a v0.5 implementation focused on core rendering functionality:
 
 ✅ **Implemented:**
+- **Multi-Editor Support**: Works in both VS Code and Cursor IDE
 - Execute JSCAD files with `main()` function
 - Render 3D geometry (geom3) in WebGL viewer
 - Smart entrypoint resolution
