@@ -9,14 +9,14 @@
  */
 
 import * as assert from 'assert';
-import * as child_process from 'child_process';
+import * as childProcess from 'child_process';
 import * as path from 'path';
 import { Readable, Writable } from 'stream';
 
 suite('MCP Server Test Suite', () => {
 	// Helper to create a test MCP client
 	function createMcpClient(mcpServerPath: string): {
-		process: child_process.ChildProcess;
+		process: childProcess.ChildProcess;
 		stdin: Writable;
 		stdout: Readable;
 		stderr: Readable;
@@ -24,7 +24,7 @@ suite('MCP Server Test Suite', () => {
 		readResponse: () => Promise<string>;
 		close: () => void;
 	} {
-		const mcpProcess = child_process.spawn(
+		const mcpProcess = childProcess.spawn(
 			process.execPath,
 			[mcpServerPath],
 			{

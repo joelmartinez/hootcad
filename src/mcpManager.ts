@@ -9,7 +9,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as child_process from 'child_process';
+import * as childProcess from 'child_process';
 
 /**
  * Configuration keys for MCP settings
@@ -22,7 +22,7 @@ const CONFIG_KEY_DONT_ASK = 'hootcad.mcp.dontAskAgain';
  */
 export class McpManager {
 	private context: vscode.ExtensionContext;
-	private mcpProcess: child_process.ChildProcess | null = null;
+	private mcpProcess: childProcess.ChildProcess | null = null;
 	private outputChannel: vscode.OutputChannel;
 	
 	constructor(context: vscode.ExtensionContext, outputChannel: vscode.OutputChannel) {
@@ -98,7 +98,7 @@ export class McpManager {
 			this.outputChannel.appendLine(`Starting MCP server: ${mcpServerPath}`);
 			
 			// Start the MCP server as a child process
-			this.mcpProcess = child_process.spawn(
+			this.mcpProcess = childProcess.spawn(
 				process.execPath, // Use Node.js executable
 				[mcpServerPath],
 				{
