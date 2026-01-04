@@ -5,6 +5,7 @@ import { ParameterCache } from './parameterCache';
 import { resolveJscadEntrypoint } from './jscadEngine';
 import { extractFilename } from './utilities';
 import { executeExportCommand } from './exportCommand';
+import { McpManager } from './mcpManager';
 
 /**
  * Manages extension lifecycle, commands, and file watchers
@@ -13,6 +14,7 @@ export class ExtensionLifecycle {
 	private context: vscode.ExtensionContext;
 	private errorReporter: ErrorReporter;
 	private webviewManager: WebviewManager;
+	private mcpManager: McpManager;
 	private statusBarItem: vscode.StatusBarItem;
 	private outputChannel: vscode.OutputChannel;
 
@@ -38,6 +40,10 @@ export class ExtensionLifecycle {
 
 		// Initialize webview manager
 		this.webviewManager = new WebviewManager(context, this.errorReporter, parameterCache, this.statusBarItem);
+		
+		// Initialize MCP manager
+		this.mcpManager = new McpManager(context, this.outputChannel);
+		context.subscriptions.push(this.mcpManager);
 	}
 
 	/**
@@ -56,6 +62,9 @@ export class ExtensionLifecycle {
 		const openPreviewCommand = vscode.commands.registerCommand('hootcad.openPreview', async () => {
 			this.errorReporter.logInfo('Opening HootCAD preview...');
 			await this.webviewManager.createOrShowPreview();
+			
+			// Show MCP enablement prompt on first preview
+			await this.mcpManager.showEnablementPrompt();
 		});
 		this.context.subscriptions.push(openPreviewCommand);
 
@@ -64,6 +73,12 @@ export class ExtensionLifecycle {
 			await executeExportCommand(this.errorReporter, this.outputChannel);
 		});
 		this.context.subscriptions.push(exportCommand);
+		
+		const enableMcpCommand = vscode.commands.registerCommand('hootcad.enableMcp', async () => {
+			this.errorReporter.logInfo('Enabling MCP Validation Server...');
+			await this.mcpManager.enableMcpServer();
+		});
+		this.context.subscriptions.push(enableMcpCommand);
 	}
 
 	/**

@@ -26,7 +26,8 @@
   "activationEvents": [
     "onLanguage:jscad",
     "onCommand:hootcad.openPreview",
-    "onCommand:hootcad.export"
+    "onCommand:hootcad.export",
+    "onCommand:hootcad.enableMcp"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -38,6 +39,10 @@
       {
         "command": "hootcad.export",
         "title": "HootCAD: Export"
+      },
+      {
+        "command": "hootcad.enableMcp",
+        "title": "HootCAD: Enable MCP Validation Server"
       }
     ],
     "languages": [
@@ -97,7 +102,9 @@
     "@jscad/stl-serializer": "^2.1.21",
     "@jscad/svg-serializer": "^2.3.19",
     "@jscad/x3d-serializer": "^2.4.11",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "@types/three": "^0.182.0",
+    "mathjs": "^15.1.0",
     "three": "^0.182.0"
   }
 }
