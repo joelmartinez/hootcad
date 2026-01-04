@@ -22,7 +22,10 @@ import {
 	ErrorCode
 } from '@modelcontextprotocol/sdk/types.js';
 
-// Use require for mathjs to work around ESM/CommonJS interop in webpack
+// Use require for mathjs to work around ESM/CommonJS interop issues in the bundled output.
+// Webpack will bundle mathjs correctly when using require(), while using ES6 import causes
+// TypeScript compilation errors due to module resolution conflicts. This is a safe pattern
+// since webpack transforms the require() into bundled code, not a runtime dependency.
 const mathjs = require('mathjs');
 
 type MathJsInstance = ReturnType<typeof mathjs.create>;

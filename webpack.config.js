@@ -95,7 +95,7 @@ const mcpServerConfig = {
     libraryTarget: 'commonjs2'
   },
   externals: {
-    // Don't bundle dependencies for the MCP server - it runs as a standalone process
+    // Bundle everything for the MCP server
   },
   resolve: {
     extensions: ['.ts', '.js']
