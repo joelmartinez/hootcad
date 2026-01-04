@@ -62,7 +62,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run copy-three && npm run package",
-    "copy-three": "node -e \"require('fs').cpSync('node_modules/three/build/three.module.js', 'src/webview/three.module.js')\"",
+    "copy-three": "node -e \"const fs=require('fs');const src='node_modules/three/build/three.module.js';const dest='src/webview/three.module.js';if(!fs.existsSync(dest)||fs.statSync(src).mtime>fs.statSync(dest).mtime){fs.cpSync(src,dest)}\"",
     "compile": "npm run copy-three && webpack",
     "watch": "npm run copy-three && webpack --watch",
     "package": "npm run copy-three && webpack --mode production --devtool hidden-source-map",
