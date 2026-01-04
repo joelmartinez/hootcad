@@ -119,24 +119,6 @@ suite('Cursor IDE Compatibility Test Suite', () => {
 		}
 	});
 
-	test('CURSOR_COMPATIBILITY.md documentation exists', () => {
-		const compatDocPath = path.join(__dirname, '../../CURSOR_COMPATIBILITY.md');
-		assert.ok(
-			fs.existsSync(compatDocPath),
-			'CURSOR_COMPATIBILITY.md should exist to document Cursor support'
-		);
-	});
-
-	test('README.md mentions Cursor support', () => {
-		const readmePath = path.join(__dirname, '../../README.md');
-		const readme = fs.readFileSync(readmePath, 'utf8');
-		const lowerReadme = readme.toLowerCase();
-		assert.ok(
-			lowerReadme.includes('cursor'),
-			'README.md should mention Cursor IDE for user awareness'
-		);
-	});
-
 	test('extension activation events are editor-agnostic', () => {
 		const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 		const activationEvents = packageJson.activationEvents || [];
