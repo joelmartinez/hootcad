@@ -47,9 +47,8 @@ export class WebviewContentProvider {
 	private getThreeJsUri(webview: vscode.Webview): vscode.Uri {
 		const threePath = vscode.Uri.joinPath(
 			this.context.extensionUri,
-			'node_modules',
-			'three',
-			'build',
+			'src',
+			'webview',
 			'three.module.js'
 		);
 		return webview.asWebviewUri(threePath);

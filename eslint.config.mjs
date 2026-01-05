@@ -3,6 +3,7 @@ import typescriptEslint from "typescript-eslint";
 export default [{
     files: ["**/*.ts"],
 }, {
+    ignores: ["src/webview/three.module.js"],
     plugins: {
         "@typescript-eslint": typescriptEslint.plugin,
     },
