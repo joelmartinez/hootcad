@@ -103,8 +103,10 @@ suite('MCP Server Test Suite', () => {
 			const mathjs = require('mathjs');
 			const math = mathjs.create(mathjs.all);
 			
-			assert.strictEqual(math.evaluate('2 ** 3'), 8);
-			assert.strictEqual(math.evaluate('10 ** 2'), 100);
+			// mathjs uses ^ for exponentiation, not **
+			assert.strictEqual(math.evaluate('2 ^ 3'), 8);
+			assert.strictEqual(math.evaluate('10 ^ 2'), 100);
+			assert.strictEqual(math.evaluate('pow(2, 3)'), 8);
 		});
 
 		test('Should evaluate expressions with math functions', () => {
@@ -129,7 +131,7 @@ suite('MCP Server Test Suite', () => {
 			const mathjs = require('mathjs');
 			const math = mathjs.create(mathjs.all);
 			
-			const result = math.evaluate('sqrt(x**2 + y**2)', { x: 3, y: 4 });
+			const result = math.evaluate('sqrt(x^2 + y^2)', { x: 3, y: 4 });
 			assert.strictEqual(result, 5);
 		});
 	});
@@ -281,7 +283,7 @@ suite('MCP Server Test Suite', () => {
 			const math = mathjs.create(mathjs.all);
 			
 			// Distance formula: sqrt((x2-x1)^2 + (y2-y1)^2)
-			const distance = math.evaluate('sqrt((x2-x1)**2 + (y2-y1)**2)', {
+			const distance = math.evaluate('sqrt((x2-x1)^2 + (y2-y1)^2)', {
 				x1: 0, y1: 0,
 				x2: 3, y2: 4
 			});

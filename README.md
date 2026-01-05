@@ -118,7 +118,8 @@ The MCP server is designed with security as the top priority:
 ### Available Tools
 
 **`math.eval`** - Safely evaluate pure numeric expressions
-- Supports basic arithmetic (`+`, `-`, `*`, `/`, `%`, `**`)
+- Supports basic arithmetic (`+`, `-`, `*`, `/`, `%`)
+- Exponentiation using `^` operator or `pow()` function
 - Whitelisted math functions (sqrt, abs, sin, cos, etc.)
 - Optional variable substitution
 - Returns finite numeric results only
@@ -128,7 +129,7 @@ Example usage by coding agents:
 {
   "tool": "math.eval",
   "arguments": {
-    "expr": "sqrt(x**2 + y**2)",
+    "expr": "sqrt(x^2 + y^2)",
     "vars": { "x": 3, "y": 4 }
   }
 }
