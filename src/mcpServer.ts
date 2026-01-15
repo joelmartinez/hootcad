@@ -145,21 +145,50 @@ async function main(): Promise<void> {
 			tools: [
 				{
 					name: 'math.eval',
-					description: 'When writing CAD geometry, test spatial assumptions by safely evaluating a pure numeric math expression with optional variables. No code execution, no side effects.',
+					description: [
+						'CAD helper: validate derived numeric values before finalizing geometry.',
+						'Use this for computations that affect geometry: distances, offsets, clearances, bounding extents, angles/camber (degrees↔radians), trig, sqrt, pi, chained transforms, pattern spacing, unit conversions.',
+						'Workflow: put the exact expression you plan to use in code into expr, pass named variables in vars, then use the returned numeric value. Avoid mental math for final dimensions.',
+						'Safe/deterministic: pure numeric math only (no code execution, no side effects).'
+					].join(' '),
 					inputSchema: {
 						type: 'object',
 						required: ['expr'],
 						properties: {
 							expr: {
 								type: 'string',
-								description: 'A pure math expression (no JS, no assignments, no property access).'
+								description: 'Pure numeric expression to evaluate. Prefer radians for angles. Example: "sqrt((x2-x1)^2 + (y2-y1)^2)" or "wheelbase/2 + tireRadius + clearance".'
 							},
 							vars: {
 								type: 'object',
 								additionalProperties: {
 									type: 'number'
 								},
-								description: 'Optional numeric variables available to the expression.'
+								description: 'Optional named numeric variables (CAD parameters, intermediate values). Example: {"wheelbase":120,"tireRadius":18,"clearance":2}.'
+							}
+						}
+					}
+				},
+				{
+					name: 'cad.eval',
+					description: [
+						'Alias of math.eval (same behavior), named for CAD workflows.',
+						'Use when computing derived dimensions or transforms (especially camber/angles and degree↔radian conversions).'
+					].join(' '),
+					inputSchema: {
+						type: 'object',
+						required: ['expr'],
+						properties: {
+							expr: {
+								type: 'string',
+								description: 'Pure numeric expression to evaluate. Prefer radians for angles.'
+							},
+							vars: {
+								type: 'object',
+								additionalProperties: {
+									type: 'number'
+								},
+								description: 'Optional named numeric variables.'
 							}
 						}
 					}
@@ -170,7 +199,7 @@ async function main(): Promise<void> {
 	
 	// Handle tool calls
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
-		if (request.params.name !== 'math.eval') {
+		if (request.params.name !== 'math.eval' && request.params.name !== 'cad.eval') {
 			throw new McpError(
 				ErrorCode.MethodNotFound,
 				`Unknown tool: ${request.params.name}`
@@ -216,7 +245,7 @@ async function main(): Promise<void> {
 				content: [
 					{
 						type: 'text',
-						text: JSON.stringify({ value })
+						text: JSON.stringify({ value, expr: args.expr, vars })
 					}
 				]
 			};

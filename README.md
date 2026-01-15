@@ -117,7 +117,7 @@ The MCP server is designed with security as the top priority:
 
 ### Available Tools
 
-**`math.eval`** - Safely evaluate pure numeric expressions
+**`math.eval`** - Safely evaluate pure numeric expressions (recommended for derived CAD dimensions)
 - Supports basic arithmetic (`+`, `-`, `*`, `/`, `%`)
 - Exponentiation using `^` operator or `pow()` function
 - Whitelisted math functions (sqrt, abs, sin, cos, etc.)

@@ -248,6 +248,10 @@ suite('MCP Server Test Suite', () => {
 					toolsResult.tools.some((t) => t.name === 'math.eval'),
 					'Expected math.eval tool to be exposed'
 				);
+				assert.ok(
+					toolsResult.tools.some((t) => t.name === 'cad.eval'),
+					'Expected cad.eval tool alias to be exposed'
+				);
 
 				const result: any = await client.callTool({
 					name: 'math.eval',
