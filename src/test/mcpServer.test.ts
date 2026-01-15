@@ -6,6 +6,11 @@
  * - Invalid syntax is rejected
  * - Security constraints are enforced
  * - Variables work correctly
+ * 
+ * IMPORTANT: Mathjs uses ^ for exponentiation, NOT JavaScript's ** operator
+ * Examples:
+ *   - Correct: math.evaluate('2 ^ 3') returns 8
+ *   - Wrong:   math.evaluate('2 ** 3') throws SyntaxError
  */
 
 import * as assert from 'assert';
