@@ -13,7 +13,7 @@ VS Code and Cursor extension to view and render JSCAD files in 3D
 - **MCP Validation Server** - Optional local server for coding agents to safely evaluate math and validate models
 - **HootCAD: Open Preview** command to open a preview panel
 - **HootCAD: Export** command to export models to various formats
-- **HootCAD: Enable MCP Validation Server** command to enable agent integration
+- **HootCAD: Enable MCP Server** command to enable agent integration
 - Activates automatically when opening `.jscad` files
 - Output channel "HootCAD" for logging and error messages
 - Status bar indicator showing current file and execution status
@@ -100,10 +100,10 @@ HootCAD includes an optional Model Context Protocol (MCP) server that provides s
 
 ### Enabling the MCP Server
 
-1. **Via Command**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) and run **HootCAD: Enable MCP Validation Server**
+1. **Via Command**: Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac) and run **HootCAD: Enable MCP Server**
 2. **Via Prompt**: The extension will prompt you to enable the server the first time you open a preview
 
-When enabled, the extension will provide configuration instructions for integrating with your coding agent (GitHub Copilot, Cursor, etc.).
+When enabled, the extension will provide configuration instructions for integrating with your coding agent.
 
 ### Security Model
 

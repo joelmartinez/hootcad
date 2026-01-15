@@ -16,6 +16,7 @@ import * as childProcess from 'child_process';
  */
 const CONFIG_KEY_ENABLED = 'hootcad.mcp.enabled';
 const CONFIG_KEY_DONT_ASK = 'hootcad.mcp.dontAskAgain';
+const CONFIG_KEY_GUIDANCE_SHOWN = 'hootcad.mcp.guidanceShown';
 
 /**
  * Manages the MCP server lifecycle
@@ -36,6 +37,16 @@ export class McpManager {
 	private isMcpEnabled(): boolean {
 		return this.context.globalState.get(CONFIG_KEY_ENABLED, false);
 	}
+
+	/**
+	 * Called on activation to start MCP automatically after opt-in.
+	 */
+	async startIfEnabled(): Promise<void> {
+		if (!this.isMcpEnabled()) {
+			return;
+		}
+		await this.startMcpServer();
+	}
 	
 	/**
 	 * Check if user has opted out of prompts
@@ -54,7 +65,7 @@ export class McpManager {
 		}
 		
 		const choice = await vscode.window.showInformationMessage(
-			'HootCAD can enable a local validation server so coding agents can safely evaluate math and validate models. This is optional and requires your approval.',
+			'HootCAD can enable a local MCP server so coding agents can safely evaluate math and validate models. This is optional and requires your approval.',
 			'Enable',
 			'Not Now',
 			"Don't Ask Again"
@@ -71,13 +82,43 @@ export class McpManager {
 	 * Enable the MCP server via command
 	 */
 	async enableMcpServer(): Promise<void> {
+		const wasEnabled = this.isMcpEnabled();
 		await this.context.globalState.update(CONFIG_KEY_ENABLED, true);
 		await this.startMcpServer();
-		
-		// Show configuration guidance
+
+		// One-time guidance: if VS Code can auto-discover MCP servers via the provider API,
+		// we only need to show Cursor/other-client setup guidance when the user first opts in.
+		const guidanceShown = this.context.globalState.get(CONFIG_KEY_GUIDANCE_SHOWN, false);
+		if (!wasEnabled && !guidanceShown) {
+			await this.showEnablementGuidance();
+			await this.context.globalState.update(CONFIG_KEY_GUIDANCE_SHOWN, true);
+		}
+
+		vscode.window.showInformationMessage('HootCAD MCP Server enabled');
+	}
+
+	private hasVsCodeMcpDefinitionProviderApi(): boolean {
+		const lm: any = (vscode as any).lm;
+		return !!lm && typeof lm.registerMcpServerDefinitionProvider === 'function';
+	}
+
+	private async showEnablementGuidance(): Promise<void> {
+		// If VS Code supports MCP definition providers, Copilot can discover our server
+		// without user config. Still offer a generic MCP client config snippet for other tools.
+		if (this.hasVsCodeMcpDefinitionProviderApi()) {
+			const choice = await vscode.window.showInformationMessage(
+				'MCP Server enabled. In VS Code, Copilot can discover this server automatically. Other MCP clients may require a client config entry.',
+				'Copy MCP Client Configuration',
+				'Dismiss'
+			);
+			if (choice === 'Copy MCP Client Configuration') {
+				await this.copyMcpClientConfigurationToClipboard();
+			}
+			return;
+		}
+
+		// Fallback: no provider API available; show the full configuration snippet.
 		await this.showConfigurationGuidance();
-		
-		vscode.window.showInformationMessage('HootCAD MCP Validation Server enabled');
 	}
 	
 	private async trySpawnMcpServer(command: string, args: string[]): Promise<boolean> {
@@ -198,40 +239,50 @@ export class McpManager {
 	private async showConfigurationGuidance(): Promise<void> {
 		const mcpServerPath = path.join(this.context.extensionPath, 'dist', 'mcpServer.js');
 		
-		const configText = `
+		const configText = this.buildMcpClientConfigurationText(mcpServerPath);
+		
+		const choice = await vscode.window.showInformationMessage(
+			'MCP client configuration ready',
+			'Copy MCP Client Configuration',
+			'Dismiss'
+		);
+		
+		if (choice === 'Copy MCP Client Configuration') {
+			await vscode.env.clipboard.writeText(configText);
+			vscode.window.showInformationMessage('MCP client configuration copied to clipboard');
+		}
+	}
+
+	private buildMcpClientConfigurationText(mcpServerPath: string): string {
+		return `
 HootCAD MCP Server Configuration
 =================================
 
-To use the MCP server with your coding agent, add this configuration:
+To use the MCP server with your coding agent, add this configuration.
 
-For GitHub Copilot / VS Code MCP:
+For other MCP clients:
+- Command: node (or absolute path to your Node.js executable)
+- Script: ${mcpServerPath}
+
+Example:
 {
   "mcpServers": {
     "hootcad": {
-	  "command": "node",
-	  "args": ["${mcpServerPath}"]
+      "command": "node",
+      "args": ["${mcpServerPath}"]
     }
   }
 }
 
-For Cursor or other agents:
-Consult your agent's MCP configuration documentation and use:
-- Command: node (or absolute path to your Node.js executable)
-- Script: ${mcpServerPath}
-
 The server exposes a "math.eval" tool for safe numeric expression evaluation.
 `;
-		
-		const choice = await vscode.window.showInformationMessage(
-			'MCP server configuration ready',
-			'Copy Configuration',
-			'Dismiss'
-		);
-		
-		if (choice === 'Copy Configuration') {
-			await vscode.env.clipboard.writeText(configText);
-			vscode.window.showInformationMessage('Configuration copied to clipboard');
-		}
+	}
+
+	private async copyMcpClientConfigurationToClipboard(): Promise<void> {
+		const mcpServerPath = path.join(this.context.extensionPath, 'dist', 'mcpServer.js');
+		const configText = this.buildMcpClientConfigurationText(mcpServerPath);
+		await vscode.env.clipboard.writeText(configText);
+		vscode.window.showInformationMessage('MCP client configuration copied to clipboard');
 	}
 	
 	/**

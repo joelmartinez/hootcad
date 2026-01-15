@@ -42,7 +42,13 @@
       },
       {
         "command": "hootcad.enableMcp",
-        "title": "HootCAD: Enable MCP Validation Server"
+        "title": "HootCAD: Enable MCP Server"
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "hootcad.mcp-servers",
+        "label": "HootCAD MCP Servers"
       }
     ],
     "languages": [

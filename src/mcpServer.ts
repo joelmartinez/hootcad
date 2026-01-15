@@ -203,6 +203,12 @@ async function main(): Promise<void> {
 		}
 		
 		try {
+			// Log tool invocation to stderr so it shows up in the extension OutputChannel.
+			// Keep it minimal: no full expression contents.
+			const exprLen = args.expr.length;
+			const varCount = vars ? Object.keys(vars).length : 0;
+			console.error(`math.eval called (exprLen=${exprLen}, varCount=${varCount})`);
+
 			// Evaluate the expression
 			const value = secureEval(args.expr, vars);
 			
