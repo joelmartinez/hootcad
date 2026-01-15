@@ -80,6 +80,65 @@ export class McpManager {
 		vscode.window.showInformationMessage('HootCAD MCP Validation Server enabled');
 	}
 	
+	private async trySpawnMcpServer(command: string, args: string[]): Promise<boolean> {
+		return await new Promise<boolean>((resolve) => {
+			let started = false;
+
+			const proc = childProcess.spawn(command, args, {
+				stdio: ['pipe', 'pipe', 'pipe'],
+				cwd: this.context.extensionPath
+			});
+
+			const startTimeout = setTimeout(() => {
+				// If we didn't see the startup banner quickly, treat as not started
+				// (this handles cases where the command launches an Electron GUI process instead).
+				if (!started) {
+					try {
+						proc.kill();
+					} catch {
+						// ignore
+					}
+					resolve(false);
+				}
+			}, 2000);
+
+			proc.stderr?.on('data', (data) => {
+				const text = data.toString();
+				this.outputChannel.appendLine(`MCP Server: ${text}`);
+				if (!started && text.includes('HootCAD MCP server started')) {
+					started = true;
+					clearTimeout(startTimeout);
+					this.mcpProcess = proc;
+					// Attach lifecycle handlers now that we've accepted this process
+					this.mcpProcess.on('exit', (code, signal) => {
+						this.outputChannel.appendLine(`MCP server exited with code ${code}, signal ${signal}`);
+						this.mcpProcess = null;
+					});
+					this.mcpProcess.on('error', (error) => {
+						this.outputChannel.appendLine(`MCP server error: ${error.message}`);
+						vscode.window.showErrorMessage(`MCP server failed to start: ${error.message}`);
+						this.mcpProcess = null;
+					});
+					resolve(true);
+				}
+			});
+
+			proc.on('exit', () => {
+				clearTimeout(startTimeout);
+				if (!started) {
+					resolve(false);
+				}
+			});
+
+			proc.on('error', () => {
+				clearTimeout(startTimeout);
+				if (!started) {
+					resolve(false);
+				}
+			});
+		});
+	}
+
 	/**
 	 * Start the MCP server process
 	 */
@@ -96,36 +155,25 @@ export class McpManager {
 			const mcpServerPath = path.join(this.context.extensionPath, 'dist', 'mcpServer.js');
 			
 			this.outputChannel.appendLine(`Starting MCP server: ${mcpServerPath}`);
-			
-			// Start the MCP server as a child process
-			this.mcpProcess = childProcess.spawn(
-				process.execPath, // Use Node.js executable
-				[mcpServerPath],
-				{
-					stdio: ['pipe', 'pipe', 'pipe'], // stdin, stdout, stderr
-					cwd: this.context.extensionPath
-				}
+
+			// Try without any Electron flags first (works for VS Code's "Code Helper (Plugin)" on macOS)
+			const startedWithoutFlag = await this.trySpawnMcpServer(process.execPath, [mcpServerPath]);
+			if (startedWithoutFlag) {
+				this.outputChannel.appendLine('MCP server started successfully');
+				return;
+			}
+
+			// Fallback: if execPath is truly an Electron binary, it may require this flag
+			const startedWithFlag = await this.trySpawnMcpServer(
+				process.execPath,
+				['--ms-enable-electron-run-as-node', mcpServerPath]
 			);
-			
-			// Log stderr (server logs go here)
-			this.mcpProcess.stderr?.on('data', (data) => {
-				this.outputChannel.appendLine(`MCP Server: ${data.toString()}`);
-			});
-			
-			// Handle process exit
-			this.mcpProcess.on('exit', (code, signal) => {
-				this.outputChannel.appendLine(`MCP server exited with code ${code}, signal ${signal}`);
-				this.mcpProcess = null;
-			});
-			
-			// Handle process errors
-			this.mcpProcess.on('error', (error) => {
-				this.outputChannel.appendLine(`MCP server error: ${error.message}`);
-				vscode.window.showErrorMessage(`MCP server failed to start: ${error.message}`);
-				this.mcpProcess = null;
-			});
-			
-			this.outputChannel.appendLine('MCP server started successfully');
+			if (startedWithFlag) {
+				this.outputChannel.appendLine('MCP server started successfully');
+				return;
+			}
+
+			throw new Error('MCP server failed to start (see output for details)');
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			this.outputChannel.appendLine(`Failed to start MCP server: ${errorMessage}`);
@@ -160,15 +208,15 @@ For GitHub Copilot / VS Code MCP:
 {
   "mcpServers": {
     "hootcad": {
-      "command": "${process.execPath}",
-      "args": ["${mcpServerPath}"]
+	  "command": "node",
+	  "args": ["${mcpServerPath}"]
     }
   }
 }
 
 For Cursor or other agents:
 Consult your agent's MCP configuration documentation and use:
-- Command: ${process.execPath}
+- Command: node (or absolute path to your Node.js executable)
 - Script: ${mcpServerPath}
 
 The server exposes a "math.eval" tool for safe numeric expression evaluation.

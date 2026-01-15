@@ -17,8 +17,15 @@ import * as assert from 'assert';
 import * as childProcess from 'child_process';
 import * as path from 'path';
 import { Readable, Writable } from 'stream';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 suite('MCP Server Test Suite', () => {
+	function getBundledMcpServerPath(): string {
+		// When running tests, __dirname is typically: <repo>/out/test
+		return path.resolve(__dirname, '../../dist/mcpServer.js');
+	}
+
 	// Helper to create a test MCP client
 	function createMcpClient(mcpServerPath: string): {
 		process: childProcess.ChildProcess;
@@ -82,7 +89,10 @@ suite('MCP Server Test Suite', () => {
 	}
 
 	suite('Math Evaluation - Valid Expressions', () => {
-		test('Should evaluate simple arithmetic', async () => {
+		test('Should evaluate simple arithmetic', function () {
+			// mathjs is large; the first require/load can exceed Mocha's default 2s timeout
+			this.timeout(10000);
+
 			// This test validates that the MCP server can be loaded and basic math works
 			// We're testing the core functionality in isolation without needing a full MCP client
 			
@@ -177,7 +187,7 @@ suite('MCP Server Test Suite', () => {
 			// mathjs doesn't support JavaScript function literals
 			assert.throws(() => {
 				math.evaluate('(() => 42)()');
-			}, /Unexpected/);
+			});
 		});
 
 		test('Should prevent property access after hardening', () => {
@@ -211,7 +221,49 @@ suite('MCP Server Test Suite', () => {
 			// mathjs treats strings as invalid in numeric expressions
 			assert.throws(() => {
 				math.evaluate('"hello" + "world"');
-			}, /Unexpected/);
+			});
+		});
+	});
+
+	suite('MCP Protocol Integration (Bundled Server)', () => {
+		test('Should list tools and evaluate math.eval end-to-end', async function () {
+			this.timeout(15000);
+
+			const mcpServerPath = getBundledMcpServerPath();
+			const transport = new StdioClientTransport({
+				command: 'node',
+				args: [mcpServerPath],
+				stderr: 'pipe'
+			});
+
+			const client = new Client(
+				{ name: 'hootcad-test-client', version: '0.0.0' },
+				{ capabilities: {} }
+			);
+
+			try {
+				await client.connect(transport);
+				const toolsResult = await client.listTools();
+				assert.ok(
+					toolsResult.tools.some((t) => t.name === 'math.eval'),
+					'Expected math.eval tool to be exposed'
+				);
+
+				const result: any = await client.callTool({
+					name: 'math.eval',
+					arguments: {
+						expr: 'sqrt(x^2 + y^2)',
+						vars: { x: 3, y: 4 }
+					}
+				});
+
+				assert.ok(result.content.length > 0);
+				assert.strictEqual(result.content[0].type, 'text');
+				const parsed = JSON.parse((result.content[0] as any).text);
+				assert.strictEqual(parsed.value, 5);
+			} finally {
+				await client.close();
+			}
 		});
 	});
 

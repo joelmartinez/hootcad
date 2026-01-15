@@ -103,8 +103,9 @@ function createSecureMathEvaluator(): (expr: string, scope?: Record<string, numb
 			}
 		}
 		
-		// Evaluate the expression
-		const result = limitedEvaluate(expr, scope);
+		// Evaluate the expression. mathjs treats a provided-but-undefined scope
+		// differently than an omitted scope, so only pass it when present.
+		const result = scope ? limitedEvaluate(expr, scope) : limitedEvaluate(expr);
 		
 		// Validate result is a finite number
 		if (typeof result !== 'number') {
