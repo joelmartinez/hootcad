@@ -1,6 +1,6 @@
 # General CAD Advice
 
-**ALWAYS use the math.eval or cad.eval tool to verify all mathematical calculations** instead of depending on your own mental math. This is critical for ensuring accuracy in CAD dimensions and transformations.
+**ALWAYS use the math.eval or cad.eval tool to verify all mathematical calculations** instead of depending on your own mental math. This is critical for ensuring accuracy in CAD dimensions and transformations, even if you think it's only a simple project, or the calculations are obvious.
 
 **Available advice categories**: general, dfm, jscad-specific
 

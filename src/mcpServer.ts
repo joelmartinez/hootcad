@@ -23,6 +23,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs';
 import * as path from 'path';
+import { MCP_SERVER_VERSION } from './mcpVersion';
 
 // Use require for mathjs to work around ESM/CommonJS interop issues in the bundled output.
 // Webpack will bundle mathjs correctly when using require(), while using ES6 import causes
@@ -187,7 +188,7 @@ async function main(): Promise<void> {
 	const server = new Server(
 		{
 			name: 'hootcad-mcp',
-			version: '0.1.0'
+			version: MCP_SERVER_VERSION
 		},
 		{
 			capabilities: {
