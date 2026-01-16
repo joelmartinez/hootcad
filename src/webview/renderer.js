@@ -221,9 +221,22 @@
 			canvas.addEventListener('wheel', (e) => {
 				e.preventDefault();
 				userHasInteracted = true; // Mark that user has interacted
+				
+				// Handle different deltaMode values (0=pixel, 1=line, 2=page)
 				const modeMultiplier = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 100 : 1);
 				const delta = e.deltaY * modeMultiplier;
-				const zoomSpeed = 0.0012;
+				
+				// Normalize for cross-platform consistency:
+				// - Windows mouse wheels typically emit large discrete values (~100-120 pixels/tick)
+				// - macOS trackpads emit many small continuous values (~1-4 pixels/tick)
+				// We detect the input type and apply appropriate sensitivity.
+				const absDelta = Math.abs(delta);
+				
+				// If delta is large (>15 pixels), it's likely a mouse wheel - use lower sensitivity
+				// If delta is small (<=15 pixels), it's likely a trackpad - use higher sensitivity
+				const isLikelyMouseWheel = absDelta > 15;
+				const zoomSpeed = isLikelyMouseWheel ? 0.0008 : 0.02;
+				
 				const zoomFactor = Math.exp(delta * zoomSpeed);
 				cameraDistance *= zoomFactor;
 				cameraDistance = Math.max(minCameraDistance, Math.min(maxCameraDistance, cameraDistance));
