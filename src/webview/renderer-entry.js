@@ -145,6 +145,11 @@ import { updateParameterUI } from './parameterUI.js';
 		const GRID_SIZE = 400;
 		const GRID_DIVISIONS = 40;
 
+		// Zoom sensitivity configuration for cross-platform mouse/trackpad support
+		const WHEEL_DELTA_THRESHOLD = 15; // Pixels - distinguishes mouse wheels from trackpads
+		const MOUSE_WHEEL_ZOOM_SPEED = 0.0008; // Lower sensitivity for discrete mouse wheel events
+		const TRACKPAD_ZOOM_SPEED = 0.02; // Higher sensitivity for continuous trackpad events
+
 		// Manual orbit-control state (shared by auto-fit + user input)
 		const cameraTarget = new THREE.Vector3(0, 0, 0);
 		const cameraRotation = { theta: Math.PI / 4, phi: Math.PI / 4 };
@@ -220,11 +225,8 @@ import { updateParameterUI } from './parameterUI.js';
 				// - macOS trackpads emit many small continuous values (~1-4 pixels/tick)
 				// We detect the input type and apply appropriate sensitivity.
 				const absDelta = Math.abs(delta);
-				
-				// If delta is large (>15 pixels), it's likely a mouse wheel - use lower sensitivity
-				// If delta is small (<=15 pixels), it's likely a trackpad - use higher sensitivity
-				const isLikelyMouseWheel = absDelta > 15;
-				const zoomSpeed = isLikelyMouseWheel ? 0.0008 : 0.02;
+				const isLikelyMouseWheel = absDelta > WHEEL_DELTA_THRESHOLD;
+				const zoomSpeed = isLikelyMouseWheel ? MOUSE_WHEEL_ZOOM_SPEED : TRACKPAD_ZOOM_SPEED;
 				
 				const zoomFactor = Math.exp(delta * zoomSpeed);
 				cameraDistance *= zoomFactor;
