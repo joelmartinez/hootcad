@@ -197,12 +197,12 @@ async function main(): Promise<void> {
 		}
 	);
 	
-	// Register tool: math.eval
+	// Register tools
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
 		return {
 			tools: [
 				{
-					name: 'cad.advice',
+					name: 'cad_advice',
 					description: [
 						'CRITICAL: Call this tool FIRST before starting ANY CAD-related work (writing JSCAD code, designing 3D models, or planning geometry).',
 						'This tool provides essential guidance for CAD design, JSCAD programming, and manufacturability.',
@@ -216,7 +216,7 @@ async function main(): Promise<void> {
 								type: 'string',
 								description: [
 									'Optional advice category. Available categories:',
-									'- "general" (default): Core CAD advice, spatial reasoning, JSCAD primitives, and math.eval usage',
+									'- "general" (default): Core CAD advice, spatial reasoning, JSCAD primitives, and cad_math usage',
 									'- "dfm": Design for Manufacturing - 3D printing constraints, tolerances, clearances',
 									'- "jscad-specific": JSCAD syntax, module system, transforms, common gotchas',
 									'Omit this parameter to get general advice which includes the list of all available categories.',
@@ -227,11 +227,13 @@ async function main(): Promise<void> {
 					}
 				},
 				{
-					name: 'math.eval',
+					name: 'cad_math',
 					description: [
-						'CAD helper: validate derived numeric values before finalizing geometry.',
-						'Use this for computations that affect geometry: distances, offsets, clearances, bounding extents, angles/camber (degrees↔radians), trig, sqrt, pi, chained transforms, pattern spacing, unit conversions.',
-						'Workflow: put the exact expression you plan to use in code into expr, pass named variables in vars, then use the returned numeric value. Avoid mental math for final dimensions.',
+						'CAD helper: validate derived numeric values before finalizing geometry or transforms.',
+						'Use this for spatial reasoning: distances, offsets, alignments, clearances, bounding extents, angles/camber (degrees↔radians), trig, sqrt, pi, chained transforms, pattern spacing, unit conversions.',
+						'REQUIRED WORKFLOW for assemblies: for every part-to-part connection, compute the intended contact/overlap numerically (gap≈0 or overlap>0) and ONLY THEN choose translate/rotate values.',
+						'Examples: gap = (socketCenter - pegCenter) - (socketRadius - pegRadius); want gap<=0.1. Or: contact = (baseTopZ) - (domeBottomZ); want contact≈0.',
+						'Put the exact expression you plan to use in code into expr, pass named variables in vars, then use the returned numeric value. Avoid mental math for final dimensions.',
 						'Safe/deterministic: pure numeric math only (no code execution, no side effects).'
 					].join(' '),
 					inputSchema: {
@@ -251,30 +253,6 @@ async function main(): Promise<void> {
 							}
 						}
 					}
-				},
-				{
-					name: 'cad.eval',
-					description: [
-						'Alias of math.eval (same behavior), named for CAD workflows.',
-						'Use when computing derived dimensions or transforms (especially camber/angles and degree↔radian conversions).'
-					].join(' '),
-					inputSchema: {
-						type: 'object',
-						required: ['expr'],
-						properties: {
-							expr: {
-								type: 'string',
-								description: 'Pure numeric expression to evaluate. Prefer radians for angles.'
-							},
-							vars: {
-								type: 'object',
-								additionalProperties: {
-									type: 'number'
-								},
-								description: 'Optional named numeric variables.'
-							}
-						}
-					}
 				}
 			]
 		};
@@ -282,8 +260,8 @@ async function main(): Promise<void> {
 	
 	// Handle tool calls
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
-		// Handle cad.advice tool
-		if (request.params.name === 'cad.advice') {
+		// Handle CAD advice tool
+		if (request.params.name === 'cad_advice') {
 			const args = request.params.arguments as {
 				category?: unknown;
 			};
@@ -302,7 +280,7 @@ async function main(): Promise<void> {
 			
 			try {
 				// Log tool invocation
-				console.error(`cad.advice called (category=${category || 'general'})`);
+				console.error(`cad_advice called (category=${category || 'general'})`);
 				
 				// Load the advice
 				const adviceContent = loadCadAdvice(category);
@@ -330,8 +308,8 @@ async function main(): Promise<void> {
 			}
 		}
 		
-		// Handle math.eval and cad.eval tools
-		if (request.params.name !== 'math.eval' && request.params.name !== 'cad.eval') {
+		// Handle CAD math tool
+		if (request.params.name !== 'cad_math') {
 			throw new McpError(
 				ErrorCode.MethodNotFound,
 				`Unknown tool: ${request.params.name}`
@@ -368,7 +346,7 @@ async function main(): Promise<void> {
 			// Keep it minimal: no full expression contents.
 			const exprLen = args.expr.length;
 			const varCount = vars ? Object.keys(vars).length : 0;
-			console.error(`math.eval called (exprLen=${exprLen}, varCount=${varCount})`);
+			console.error(`cad_math called (exprLen=${exprLen}, varCount=${varCount})`);
 
 			// Evaluate the expression
 			const value = secureEval(args.expr, vars);

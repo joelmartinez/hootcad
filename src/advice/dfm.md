@@ -62,5 +62,5 @@ Before finalizing your design:
 - [ ] Clearances appropriate for intended fit type
 - [ ] Hole diameters account for printer tolerance
 - [ ] Part orientation optimized for strength and minimal support
-- [ ] Critical dimensions verified with math.eval tool
+- [ ] Critical dimensions verified with cad_math tool
 - [ ] Features larger than minimum printable size

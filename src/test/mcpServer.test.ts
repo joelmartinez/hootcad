@@ -226,7 +226,7 @@ suite('MCP Server Test Suite', () => {
 	});
 
 	suite('MCP Protocol Integration (Bundled Server)', () => {
-		test('Should list tools and evaluate math.eval end-to-end', async function () {
+		test('Should list tools and evaluate cad_math end-to-end', async function () {
 			this.timeout(15000);
 
 			const mcpServerPath = getBundledMcpServerPath();
@@ -245,16 +245,16 @@ suite('MCP Server Test Suite', () => {
 				await client.connect(transport);
 				const toolsResult = await client.listTools();
 				assert.ok(
-					toolsResult.tools.some((t) => t.name === 'math.eval'),
-					'Expected math.eval tool to be exposed'
+					toolsResult.tools.some((t) => t.name === 'cad_math'),
+					'Expected cad_math tool to be exposed'
 				);
 				assert.ok(
-					toolsResult.tools.some((t) => t.name === 'cad.eval'),
-					'Expected cad.eval tool alias to be exposed'
+					toolsResult.tools.some((t) => t.name === 'cad_advice'),
+					'Expected cad_advice tool to be exposed'
 				);
 
 				const result: any = await client.callTool({
-					name: 'math.eval',
+					name: 'cad_math',
 					arguments: {
 						expr: 'sqrt(x^2 + y^2)',
 						vars: { x: 3, y: 4 }
@@ -399,7 +399,7 @@ suite('MCP Server Test Suite', () => {
 			// Read and validate content
 			const content = fs.readFileSync(generalFile, 'utf-8');
 			assert.ok(content.length > 0, 'general.md should not be empty');
-			assert.ok(content.includes('math.eval'), 'general.md should mention math.eval tool');
+			assert.ok(content.includes('cad_math'), 'general.md should mention cad_math tool');
 			assert.ok(content.includes('Available advice categories'), 'general.md should list categories');
 		});
 
