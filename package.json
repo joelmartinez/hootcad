@@ -24,7 +24,6 @@
     "vscode"
   ],
   "activationEvents": [
-    "onLanguage:jscad",
     "onCommand:hootcad.openPreview",
     "onCommand:hootcad.export",
     "onCommand:hootcad.enableMcp"
@@ -53,21 +52,10 @@
     ],
     "languages": [
       {
-        "id": "jscad",
+        "id": "javascript",
         "extensions": [
           ".jscad"
-        ],
-        "aliases": [
-          "JSCAD"
-        ],
-        "configuration": "./language-configuration.json"
-      }
-    ],
-    "grammars": [
-      {
-        "language": "jscad",
-        "scopeName": "source.js",
-        "path": "./syntaxes/jscad.tmLanguage.json"
+        ]
       }
     ]
   },
