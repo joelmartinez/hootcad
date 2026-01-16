@@ -135,9 +135,10 @@ function loadCadAdvice(category?: string): string {
 	const categoryName = category || 'general';
 	
 	// Validate category name to prevent path traversal attacks
+	// Only allow lowercase letters, numbers, and hyphens
 	const validCategoryPattern = /^[a-z0-9-]+$/;
 	if (!validCategoryPattern.test(categoryName)) {
-		throw new Error(`Invalid category name: ${categoryName}`);
+		throw new Error(`Invalid category name: ${categoryName}. Category names must contain only lowercase letters, numbers, and hyphens.`);
 	}
 	
 	// Construct path to advice file
@@ -217,9 +218,9 @@ async function main(): Promise<void> {
 									'- "general" (default): Core CAD advice, spatial reasoning, JSCAD primitives, and math.eval usage',
 									'- "dfm": Design for Manufacturing - 3D printing constraints, tolerances, clearances',
 									'- "jscad-specific": JSCAD syntax, module system, transforms, common gotchas',
-									'Omit this parameter to get general advice which includes the list of all available categories.'
-								].join(' '),
-								enum: ['general', 'dfm', 'jscad-specific']
+									'Omit this parameter to get general advice which includes the list of all available categories.',
+									'Category names must be lowercase alphanumeric with hyphens only.'
+								].join(' ')
 							}
 						}
 					}
