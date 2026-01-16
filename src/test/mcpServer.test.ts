@@ -382,4 +382,81 @@ suite('MCP Server Test Suite', () => {
 			assert.strictEqual(Math.round(circumference * 100) / 100, 31.42);
 		});
 	});
+
+	suite('CAD Advice Tool', () => {
+		test('Should load general advice by default', function () {
+			this.timeout(10000);
+			
+			// Load the advice loading function from the bundled server
+			const fs = require('fs');
+			const path = require('path');
+			const adviceDir = path.resolve(__dirname, '../../dist/advice');
+			const generalFile = path.join(adviceDir, 'general.md');
+			
+			// Verify the file exists
+			assert.ok(fs.existsSync(generalFile), 'general.md should exist in dist/advice');
+			
+			// Read and validate content
+			const content = fs.readFileSync(generalFile, 'utf-8');
+			assert.ok(content.length > 0, 'general.md should not be empty');
+			assert.ok(content.includes('math.eval'), 'general.md should mention math.eval tool');
+			assert.ok(content.includes('Available advice categories'), 'general.md should list categories');
+		});
+
+		test('Should load DFM advice', function () {
+			this.timeout(10000);
+			
+			const fs = require('fs');
+			const path = require('path');
+			const adviceDir = path.resolve(__dirname, '../../dist/advice');
+			const dfmFile = path.join(adviceDir, 'dfm.md');
+			
+			// Verify the file exists
+			assert.ok(fs.existsSync(dfmFile), 'dfm.md should exist in dist/advice');
+			
+			// Read and validate content
+			const content = fs.readFileSync(dfmFile, 'utf-8');
+			assert.ok(content.length > 0, 'dfm.md should not be empty');
+			assert.ok(content.includes('3D printing') || content.includes('3D Printing'), 'dfm.md should mention 3D printing');
+			assert.ok(content.includes('tolerance') || content.includes('Tolerance'), 'dfm.md should mention tolerances');
+		});
+
+		test('Should load JSCAD-specific advice', function () {
+			this.timeout(10000);
+			
+			const fs = require('fs');
+			const path = require('path');
+			const adviceDir = path.resolve(__dirname, '../../dist/advice');
+			const jscadFile = path.join(adviceDir, 'jscad-specific.md');
+			
+			// Verify the file exists
+			assert.ok(fs.existsSync(jscadFile), 'jscad-specific.md should exist in dist/advice');
+			
+			// Read and validate content
+			const content = fs.readFileSync(jscadFile, 'utf-8');
+			assert.ok(content.length > 0, 'jscad-specific.md should not be empty');
+			assert.ok(content.includes('JSCAD') || content.includes('jscad'), 'jscad-specific.md should mention JSCAD');
+			assert.ok(content.includes('require'), 'jscad-specific.md should mention CommonJS require');
+		});
+
+		test('Should have all expected categories', function () {
+			this.timeout(10000);
+			
+			const fs = require('fs');
+			const path = require('path');
+			const adviceDir = path.resolve(__dirname, '../../dist/advice');
+			
+			// Check that all expected files exist
+			const expectedCategories = ['general', 'dfm', 'jscad-specific'];
+			for (const category of expectedCategories) {
+				const file = path.join(adviceDir, `${category}.md`);
+				assert.ok(fs.existsSync(file), `${category}.md should exist`);
+			}
+			
+			// List all .md files
+			const files = fs.readdirSync(adviceDir);
+			const mdFiles = files.filter((f: string) => f.endsWith('.md'));
+			assert.strictEqual(mdFiles.length, 3, 'Should have exactly 3 advice files');
+		});
+	});
 });

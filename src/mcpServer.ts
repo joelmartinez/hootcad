@@ -1,9 +1,9 @@
 /**
- * MCP Server for HootCAD - Safe Math Evaluation
+ * MCP Server for HootCAD - Safe Math Evaluation and CAD Advice
  * 
  * This server exposes safe, deterministic math evaluation capabilities
- * for agent validation loops. It does NOT execute arbitrary code or
- * perform CAD operations directly.
+ * and CAD design advice for agent validation loops. It does NOT execute 
+ * arbitrary code or perform CAD operations directly.
  * 
  * Security Model:
  * - No arbitrary code execution (no eval, no Function constructor)
@@ -21,6 +21,8 @@ import {
 	McpError,
 	ErrorCode
 } from '@modelcontextprotocol/sdk/types.js';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Use require for mathjs to work around ESM/CommonJS interop issues in the bundled output.
 // Webpack will bundle mathjs correctly when using require(), while using ES6 import causes
@@ -120,6 +122,66 @@ function createSecureMathEvaluator(): (expr: string, scope?: Record<string, numb
 }
 
 /**
+ * Load CAD advice from markdown files
+ * 
+ * Reads advice content from the advice directory. Categories are defined
+ * by markdown filenames (e.g., general.md, dfm.md, jscad-specific.md).
+ * 
+ * @param category Optional category name. If not provided, returns general advice.
+ * @returns Array of advice strings (one per line from the markdown file)
+ */
+function loadCadAdvice(category?: string): string[] {
+	// Default to general advice if no category specified
+	const categoryName = category || 'general';
+	
+	// Validate category name to prevent path traversal attacks
+	const validCategoryPattern = /^[a-z0-9-]+$/;
+	if (!validCategoryPattern.test(categoryName)) {
+		throw new Error(`Invalid category name: ${categoryName}`);
+	}
+	
+	// Construct path to advice file
+	// When bundled, advice files are in the same directory as mcpServer.js
+	const adviceDir = path.join(__dirname, 'advice');
+	const adviceFile = path.join(adviceDir, `${categoryName}.md`);
+	
+	// Check if file exists
+	if (!fs.existsSync(adviceFile)) {
+		throw new Error(`Unknown advice category: ${categoryName}. Available categories: general, dfm, jscad-specific`);
+	}
+	
+	// Read and parse the markdown file
+	const content = fs.readFileSync(adviceFile, 'utf-8');
+	
+	// Split into lines and filter out empty lines
+	const lines = content
+		.split('\n')
+		.map(line => line.trim())
+		.filter(line => line.length > 0);
+	
+	return lines;
+}
+
+/**
+ * Get list of available advice categories
+ */
+function getAvailableCategories(): string[] {
+	const adviceDir = path.join(__dirname, 'advice');
+	
+	// If directory doesn't exist, return empty array
+	if (!fs.existsSync(adviceDir)) {
+		return [];
+	}
+	
+	// Read all .md files in the advice directory
+	const files = fs.readdirSync(adviceDir);
+	return files
+		.filter(file => file.endsWith('.md'))
+		.map(file => file.replace('.md', ''))
+		.sort();
+}
+
+/**
  * Initialize and start the MCP server
  */
 async function main(): Promise<void> {
@@ -143,6 +205,31 @@ async function main(): Promise<void> {
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
 		return {
 			tools: [
+				{
+					name: 'cad.advice',
+					description: [
+						'CRITICAL: Call this tool FIRST before starting ANY CAD-related work (writing JSCAD code, designing 3D models, or planning geometry).',
+						'This tool provides essential guidance for CAD design, JSCAD programming, and manufacturability.',
+						'Returns expert advice as an array of text lines covering best practices, common patterns, and critical considerations.',
+						'Always review the advice before writing code to avoid common mistakes and ensure design quality.'
+					].join(' '),
+					inputSchema: {
+						type: 'object',
+						properties: {
+							category: {
+								type: 'string',
+								description: [
+									'Optional advice category. Available categories:',
+									'- "general" (default): Core CAD advice, spatial reasoning, JSCAD primitives, and math.eval usage',
+									'- "dfm": Design for Manufacturing - 3D printing constraints, tolerances, clearances',
+									'- "jscad-specific": JSCAD syntax, module system, transforms, common gotchas',
+									'Omit this parameter to get general advice which includes the list of all available categories.'
+								].join(' '),
+								enum: ['general', 'dfm', 'jscad-specific']
+							}
+						}
+					}
+				},
 				{
 					name: 'math.eval',
 					description: [
@@ -199,6 +286,55 @@ async function main(): Promise<void> {
 	
 	// Handle tool calls
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
+		// Handle cad.advice tool
+		if (request.params.name === 'cad.advice') {
+			const args = request.params.arguments as {
+				category?: unknown;
+			};
+			
+			// Validate optional category argument
+			let category: string | undefined;
+			if (args.category !== undefined) {
+				if (typeof args.category !== 'string') {
+					throw new McpError(
+						ErrorCode.InvalidParams,
+						'category must be a string'
+					);
+				}
+				category = args.category;
+			}
+			
+			try {
+				// Log tool invocation
+				console.error(`cad.advice called (category=${category || 'general'})`);
+				
+				// Load the advice
+				const advice = loadCadAdvice(category);
+				const categories = getAvailableCategories();
+				
+				// Return advice as JSON with metadata
+				return {
+					content: [
+						{
+							type: 'text',
+							text: JSON.stringify({
+								category: category || 'general',
+								availableCategories: categories,
+								advice: advice
+							}, null, 2)
+						}
+					]
+				};
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				throw new McpError(
+					ErrorCode.InternalError,
+					`Failed to load CAD advice: ${errorMessage}`
+				);
+			}
+		}
+		
+		// Handle math.eval and cad.eval tools
 		if (request.params.name !== 'math.eval' && request.params.name !== 'cad.eval') {
 			throw new McpError(
 				ErrorCode.MethodNotFound,
