@@ -128,9 +128,9 @@ function createSecureMathEvaluator(): (expr: string, scope?: Record<string, numb
  * by markdown filenames (e.g., general.md, dfm.md, jscad-specific.md).
  * 
  * @param category Optional category name. If not provided, returns general advice.
- * @returns Array of advice strings (one per line from the markdown file)
+ * @returns The complete markdown content as a string
  */
-function loadCadAdvice(category?: string): string[] {
+function loadCadAdvice(category?: string): string {
 	// Default to general advice if no category specified
 	const categoryName = category || 'general';
 	
@@ -147,19 +147,13 @@ function loadCadAdvice(category?: string): string[] {
 	
 	// Check if file exists
 	if (!fs.existsSync(adviceFile)) {
-		throw new Error(`Unknown advice category: ${categoryName}. Available categories: general, dfm, jscad-specific`);
+		const availableCategories = getAvailableCategories();
+		throw new Error(`Unknown advice category: ${categoryName}. Available categories: ${availableCategories.join(', ')}`);
 	}
 	
-	// Read and parse the markdown file
+	// Read and return the markdown content as-is to preserve formatting
 	const content = fs.readFileSync(adviceFile, 'utf-8');
-	
-	// Split into lines and filter out empty lines
-	const lines = content
-		.split('\n')
-		.map(line => line.trim())
-		.filter(line => line.length > 0);
-	
-	return lines;
+	return content;
 }
 
 /**
@@ -309,10 +303,10 @@ async function main(): Promise<void> {
 				console.error(`cad.advice called (category=${category || 'general'})`);
 				
 				// Load the advice
-				const advice = loadCadAdvice(category);
+				const adviceContent = loadCadAdvice(category);
 				const categories = getAvailableCategories();
 				
-				// Return advice as JSON with metadata
+				// Return advice as markdown text with metadata in JSON format
 				return {
 					content: [
 						{
@@ -320,7 +314,7 @@ async function main(): Promise<void> {
 							text: JSON.stringify({
 								category: category || 'general',
 								availableCategories: categories,
-								advice: advice
+								content: adviceContent
 							}, null, 2)
 						}
 					]

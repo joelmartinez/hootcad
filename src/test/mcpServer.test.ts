@@ -417,8 +417,8 @@ suite('MCP Server Test Suite', () => {
 			// Read and validate content
 			const content = fs.readFileSync(dfmFile, 'utf-8');
 			assert.ok(content.length > 0, 'dfm.md should not be empty');
-			assert.ok(content.includes('3D printing') || content.includes('3D Printing'), 'dfm.md should mention 3D printing');
-			assert.ok(content.includes('tolerance') || content.includes('Tolerance'), 'dfm.md should mention tolerances');
+			assert.ok(content.toLowerCase().includes('3d print'), 'dfm.md should mention 3D printing');
+			assert.ok(content.toLowerCase().includes('tolerance'), 'dfm.md should mention tolerances');
 		});
 
 		test('Should load JSCAD-specific advice', function () {
