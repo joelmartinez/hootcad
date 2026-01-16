@@ -27,7 +27,7 @@ When planning JSCAD code, decompose the user's requirements into basic primitive
 - Define dimensions as named constants at the top of your code for clarity
 - Use the math.eval tool to compute derived dimensions (clearances, offsets, diagonal distances)
 - Consider tolerances and clearances for assemblies (typically 0.1-0.5mm for 3D printing)
-- Verify critical dimensions with math.eval before finalizing geometry
+- Verify all dimensions and calculations with math.eval before finalizing geometry
 
 ## Common JSCAD Patterns
 
