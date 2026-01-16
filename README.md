@@ -117,6 +117,25 @@ The MCP server is designed with security as the top priority:
 
 ### Available Tools
 
+**`cad.advice`** - Get expert CAD design guidance (CALL THIS FIRST before any CAD work)
+- Provides essential guidance for CAD design, JSCAD programming, and manufacturability
+- Available categories:
+  - `general` (default): Core CAD advice, spatial reasoning, JSCAD primitives, emphasizes using math.eval
+  - `dfm`: Design for Manufacturing - 3D printing constraints, tolerances, clearances
+  - `jscad-specific`: JSCAD syntax, module system, transforms, common gotchas
+- Returns structured advice as markdown with metadata
+
+Example usage by coding agents:
+```json
+{
+  "tool": "cad.advice",
+  "arguments": {
+    "category": "general"
+  }
+}
+// Returns: { "category": "general", "availableCategories": [...], "content": "..." }
+```
+
 **`math.eval`** - Safely evaluate pure numeric expressions (recommended for derived CAD dimensions)
 - Supports basic arithmetic (`+`, `-`, `*`, `/`, `%`)
 - Exponentiation using `^` operator or `pow()` function
