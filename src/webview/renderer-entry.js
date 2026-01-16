@@ -146,9 +146,12 @@ import { updateParameterUI } from './parameterUI.js';
 		const GRID_DIVISIONS = 40;
 
 		// Zoom sensitivity configuration for cross-platform mouse/trackpad support
+		// These values are tuned to provide comfortable zoom speeds for both input types:
+		// - Mouse wheels emit large discrete deltas (~100 pixels), need lower sensitivity
+		// - Trackpads emit small continuous deltas (~1-4 pixels), need moderate sensitivity
 		const WHEEL_DELTA_THRESHOLD = 15; // Pixels - distinguishes mouse wheels from trackpads
-		const MOUSE_WHEEL_ZOOM_SPEED = 0.0008; // Lower sensitivity for discrete mouse wheel events
-		const TRACKPAD_ZOOM_SPEED = 0.02; // Higher sensitivity for continuous trackpad events
+		const MOUSE_WHEEL_ZOOM_SPEED = 0.0008; // ~8% zoom per mouse wheel tick
+		const TRACKPAD_ZOOM_SPEED = 0.005; // ~1% zoom per typical trackpad delta
 
 		// Manual orbit-control state (shared by auto-fit + user input)
 		const cameraTarget = new THREE.Vector3(0, 0, 0);
