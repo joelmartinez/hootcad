@@ -368,8 +368,7 @@ import { InputController } from './inputController.js';
 			// Keep the key light aimed at the model center and tighten the shadow frustum
 			// so shadows are higher-res and less blocky.
 			if (keyLight) {
-				const center = new THREE.Vector3(bounds.center.x, bounds.center.y, bounds.center.z);
-				keyLight.target.position.copy(center);
+				keyLight.target.position.set(bounds.center.x, bounds.center.y, bounds.center.z);
 				keyLight.target.updateMatrixWorld(true);
 
 				if (SHADOW_PRESET.enabled && keyLight.castShadow) {

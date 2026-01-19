@@ -1,6 +1,9 @@
 /**
  * Camera controller for the 3D viewer
  * Manages camera state and position updates for orbit controls
+ * 
+ * Note: Works with plain {x, y, z} objects for target to avoid THREE.js dependency
+ * The camera.lookAt() method accepts both Vector3 and plain objects with x, y, z
  */
 
 export class CameraController {
@@ -22,6 +25,7 @@ export class CameraController {
 		this.camera.position.x = this.target.x + this.distance * sinPhi * Math.cos(this.rotation.theta);
 		this.camera.position.y = this.target.y + this.distance * sinPhi * Math.sin(this.rotation.theta);
 		this.camera.position.z = this.target.z + this.distance * Math.cos(this.rotation.phi);
+		// THREE.js lookAt accepts objects with x, y, z properties
 		this.camera.lookAt(this.target);
 	}
 
