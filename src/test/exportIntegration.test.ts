@@ -105,6 +105,33 @@ suite('Export Integration Test Suite', () => {
                 assert.ok(typeof jsonSerializer.serialize === 'function', 'JSON serializer should have serialize function');
             });
         });
+        
+        test('AMF serializer can be loaded', () => {
+            const extensionRequire = getExtensionRequire();
+            assert.doesNotThrow(() => {
+                const amfSerializer = extensionRequire('@jscad/amf-serializer');
+                assert.ok(amfSerializer, 'AMF serializer should load');
+                assert.ok(typeof amfSerializer.serialize === 'function', 'AMF serializer should have serialize function');
+            });
+        });
+        
+        test('DXF serializer can be loaded', () => {
+            const extensionRequire = getExtensionRequire();
+            assert.doesNotThrow(() => {
+                const dxfSerializer = extensionRequire('@jscad/dxf-serializer');
+                assert.ok(dxfSerializer, 'DXF serializer should load');
+                assert.ok(typeof dxfSerializer.serialize === 'function', 'DXF serializer should have serialize function');
+            });
+        });
+        
+        test('X3D serializer can be loaded', () => {
+            const extensionRequire = getExtensionRequire();
+            assert.doesNotThrow(() => {
+                const x3dSerializer = extensionRequire('@jscad/x3d-serializer');
+                assert.ok(x3dSerializer, 'X3D serializer should load');
+                assert.ok(typeof x3dSerializer.serialize === 'function', 'X3D serializer should have serialize function');
+            });
+        });
     });
     
     suite('End-to-End Export Workflow', () => {
@@ -213,6 +240,237 @@ suite('Export Integration Test Suite', () => {
                 assert.ok(svgData.length > 0, 'Should return data');
                 assert.ok(typeof svgData[0] === 'string', 'SVG should be string');
                 assert.ok(svgData[0].includes('<svg'), 'SVG should contain svg tag');
+            }
+        });
+        
+        test('Can execute JSCAD and serialize to OBJ without triangulate', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const objSerializer = extensionRequire('@jscad/obj-serializer');
+            const objData = objSerializer.serialize({ triangulate: false }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(objData), 'Should return array');
+            assert.ok(objData.length > 0, 'Should return data');
+            assert.ok(typeof objData[0] === 'string', 'OBJ should be string');
+            assert.ok(objData[0].includes('v '), 'OBJ should contain vertex data');
+            assert.ok(objData[0].includes('f '), 'OBJ should contain face data');
+        });
+        
+        test('Can execute JSCAD and serialize to AMF with default unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const amfSerializer = extensionRequire('@jscad/amf-serializer');
+            const amfData = amfSerializer.serialize({ unit: 'millimeter' }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(amfData), 'Should return array');
+            assert.ok(amfData.length > 0, 'Should return data');
+            assert.ok(typeof amfData[0] === 'string', 'AMF should be string');
+            assert.ok(amfData[0].includes('<?xml'), 'AMF should be XML format');
+            assert.ok(amfData[0].includes('<amf'), 'AMF should contain amf tag');
+        });
+        
+        test('Can execute JSCAD and serialize to AMF with inch unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const amfSerializer = extensionRequire('@jscad/amf-serializer');
+            const amfData = amfSerializer.serialize({ unit: 'inch' }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(amfData), 'Should return array');
+            assert.ok(amfData.length > 0, 'Should return data');
+            assert.ok(typeof amfData[0] === 'string', 'AMF should be string');
+            assert.ok(amfData[0].includes('<?xml'), 'AMF should be XML format');
+        });
+        
+        test('Can execute JSCAD and serialize to AMF with feet unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const amfSerializer = extensionRequire('@jscad/amf-serializer');
+            const amfData = amfSerializer.serialize({ unit: 'feet' }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(amfData), 'Should return array');
+            assert.ok(amfData.length > 0, 'Should return data');
+            assert.ok(typeof amfData[0] === 'string', 'AMF should be string');
+        });
+        
+        test('Can execute JSCAD and serialize to AMF with meter unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const amfSerializer = extensionRequire('@jscad/amf-serializer');
+            const amfData = amfSerializer.serialize({ unit: 'meter' }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(amfData), 'Should return array');
+            assert.ok(amfData.length > 0, 'Should return data');
+            assert.ok(typeof amfData[0] === 'string', 'AMF should be string');
+        });
+        
+        test('Can execute JSCAD and serialize to AMF with micrometer unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const amfSerializer = extensionRequire('@jscad/amf-serializer');
+            const amfData = amfSerializer.serialize({ unit: 'micrometer' }, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(amfData), 'Should return array');
+            assert.ok(amfData.length > 0, 'Should return data');
+            assert.ok(typeof amfData[0] === 'string', 'AMF should be string');
+        });
+        
+        test('Can execute JSCAD and serialize to DXF', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const dxfSerializer = extensionRequire('@jscad/dxf-serializer');
+            const dxfData = dxfSerializer.serialize({}, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(dxfData), 'Should return array');
+            assert.ok(dxfData.length > 0, 'Should return data');
+            assert.ok(typeof dxfData[0] === 'string', 'DXF should be string');
+            assert.ok(dxfData[0].includes('0\nSECTION'), 'DXF should contain SECTION keyword');
+        });
+        
+        test('Can execute 2D JSCAD and serialize to DXF', async () => {
+            const filePath = path.join(fixturesPath, 'valid-2d.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const dxfSerializer = extensionRequire('@jscad/dxf-serializer');
+            const dxfData = dxfSerializer.serialize({}, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(dxfData), 'Should return array');
+            assert.ok(dxfData.length > 0, 'Should return data');
+            assert.ok(typeof dxfData[0] === 'string', 'DXF should be string');
+        });
+        
+        test('Can execute JSCAD and serialize to X3D', async () => {
+            const filePath = path.join(fixturesPath, 'valid-cube.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const x3dSerializer = extensionRequire('@jscad/x3d-serializer');
+            const x3dData = x3dSerializer.serialize({}, ...jscadGeometries);
+            
+            assert.ok(Array.isArray(x3dData), 'Should return array');
+            assert.ok(x3dData.length > 0, 'Should return data');
+            assert.ok(typeof x3dData[0] === 'string', 'X3D should be string');
+            assert.ok(x3dData[0].includes('<?xml'), 'X3D should be XML format');
+            assert.ok(x3dData[0].includes('<X3D'), 'X3D should contain X3D tag');
+        });
+        
+        test('Can execute 2D JSCAD and serialize to SVG with cm unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-2d.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const geom2Objects = jscadGeometries.filter(g => 
+                modeling.geometries.geom2.isA(g)
+            );
+            
+            if (geom2Objects.length > 0) {
+                const svgSerializer = extensionRequire('@jscad/svg-serializer');
+                const svgData = svgSerializer.serialize({ unit: 'cm' }, ...geom2Objects);
+                
+                assert.ok(Array.isArray(svgData), 'Should return array');
+                assert.ok(svgData.length > 0, 'Should return data');
+                assert.ok(typeof svgData[0] === 'string', 'SVG should be string');
+                assert.ok(svgData[0].includes('<svg'), 'SVG should contain svg tag');
+            }
+        });
+        
+        test('Can execute 2D JSCAD and serialize to SVG with in unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-2d.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const geom2Objects = jscadGeometries.filter(g => 
+                modeling.geometries.geom2.isA(g)
+            );
+            
+            if (geom2Objects.length > 0) {
+                const svgSerializer = extensionRequire('@jscad/svg-serializer');
+                const svgData = svgSerializer.serialize({ unit: 'in' }, ...geom2Objects);
+                
+                assert.ok(Array.isArray(svgData), 'Should return array');
+                assert.ok(svgData.length > 0, 'Should return data');
+                assert.ok(typeof svgData[0] === 'string', 'SVG should be string');
+            }
+        });
+        
+        test('Can execute 2D JSCAD and serialize to SVG with px unit', async () => {
+            const filePath = path.join(fixturesPath, 'valid-2d.jscad');
+            
+            const geometries = await executeJscadFile(filePath, mockOutputChannel);
+            
+            const extensionRequire = getExtensionRequire();
+            const modeling = extensionRequire('@jscad/modeling');
+            const jscadGeometries = convertGeometries(geometries, modeling);
+            
+            const geom2Objects = jscadGeometries.filter(g => 
+                modeling.geometries.geom2.isA(g)
+            );
+            
+            if (geom2Objects.length > 0) {
+                const svgSerializer = extensionRequire('@jscad/svg-serializer');
+                const svgData = svgSerializer.serialize({ unit: 'px' }, ...geom2Objects);
+                
+                assert.ok(Array.isArray(svgData), 'Should return array');
+                assert.ok(svgData.length > 0, 'Should return data');
+                assert.ok(typeof svgData[0] === 'string', 'SVG should be string');
             }
         });
         
