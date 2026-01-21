@@ -1,4 +1,4 @@
-# HootCAD Architecture
+# HootCAD Extension Architecture
 
 ## Overview
 
