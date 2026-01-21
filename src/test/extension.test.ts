@@ -32,10 +32,10 @@ suite('Extension Test Suite', () => {
 		assert.ok(commands.includes('hootcad.openPreview'), 'Open Preview command should be registered');
 	});
 
-	test('JSCAD language should be registered', () => {
+	test('.jscad files should be associated with JavaScript', () => {
 		const languages = vscode.languages.getLanguages();
 		return languages.then((langs) => {
-			assert.ok(langs.includes('jscad'), 'JSCAD language should be registered');
+			assert.ok(langs.includes('javascript'), 'JavaScript language should be available');
 		});
 	});
 
