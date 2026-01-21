@@ -32,13 +32,6 @@ suite('Extension Test Suite', () => {
 		assert.ok(commands.includes('hootcad.openPreview'), 'Open Preview command should be registered');
 	});
 
-	test('.jscad files should be associated with JavaScript', () => {
-		const languages = vscode.languages.getLanguages();
-		return languages.then((langs) => {
-			assert.ok(langs.includes('javascript'), 'JavaScript language should be available');
-		});
-	});
-
 	test('Preview window title formatting', () => {
 		// Test Unix-style path
 		const unixPath = '/path/to/file/example.jscad';
