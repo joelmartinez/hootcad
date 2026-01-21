@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { convertGeom3ToBufferGeometry, convertGeom2ToLineGeometry } from './converter.js';
 import { updateParameterUI } from './parameterUI.js';
+import { CameraController } from './cameraController.js';
+import { InputController } from './inputController.js';
 
 (function () {
 	function showBootError(error) {
@@ -145,80 +147,9 @@ import { updateParameterUI } from './parameterUI.js';
 		const GRID_SIZE = 400;
 		const GRID_DIVISIONS = 40;
 
-		// Manual orbit-control state (shared by auto-fit + user input)
-		const cameraTarget = new THREE.Vector3(0, 0, 0);
-		const cameraRotation = { theta: Math.PI / 4, phi: Math.PI / 4 };
-		let cameraDistance = 50;
-		let minCameraDistance = 5;
-		let maxCameraDistance = 200;
-
-		function updateCameraPosition() {
-			const sinPhi = Math.sin(cameraRotation.phi);
-			// Z-up camera orbit (JSCAD-style). theta rotates in XY, phi is polar angle from +Z.
-			camera.position.x = cameraTarget.x + cameraDistance * sinPhi * Math.cos(cameraRotation.theta);
-			camera.position.y = cameraTarget.y + cameraDistance * sinPhi * Math.sin(cameraRotation.theta);
-			camera.position.z = cameraTarget.z + cameraDistance * Math.cos(cameraRotation.phi);
-			camera.lookAt(cameraTarget);
-		}
-
-		function syncControlsFromCamera() {
-			const offset = new THREE.Vector3().subVectors(camera.position, cameraTarget);
-			cameraDistance = offset.length();
-			if (cameraDistance < 1e-6) {
-				return;
-			}
-			cameraRotation.theta = Math.atan2(offset.y, offset.x);
-			const cosPhi = offset.z / cameraDistance;
-			cameraRotation.phi = Math.acos(Math.max(-1, Math.min(1, cosPhi)));
-		}
-
-		function setupControls() {
-			let isDragging = false;
-			let previousMousePosition = { x: 0, y: 0 };
-
-			canvas.addEventListener('mousedown', (e) => {
-				isDragging = true;
-				userHasInteracted = true; // Mark that user has interacted
-				previousMousePosition = { x: e.clientX, y: e.clientY };
-			});
-
-			canvas.addEventListener('mousemove', (e) => {
-				if (!isDragging) {
-					return;
-				}
-
-				const deltaX = e.clientX - previousMousePosition.x;
-				const deltaY = e.clientY - previousMousePosition.y;
-
-				cameraRotation.theta += deltaX * 0.01;
-				cameraRotation.phi -= deltaY * 0.01;
-				cameraRotation.phi = Math.max(0.1, Math.min(Math.PI - 0.1, cameraRotation.phi));
-
-				updateCameraPosition();
-
-				previousMousePosition = { x: e.clientX, y: e.clientY };
-			});
-
-			canvas.addEventListener('mouseup', () => {
-				isDragging = false;
-			});
-
-			canvas.addEventListener('mouseleave', () => {
-				isDragging = false;
-			});
-
-			canvas.addEventListener('wheel', (e) => {
-				e.preventDefault();
-				userHasInteracted = true; // Mark that user has interacted
-				const modeMultiplier = e.deltaMode === 1 ? 16 : (e.deltaMode === 2 ? 100 : 1);
-				const delta = e.deltaY * modeMultiplier;
-				const zoomSpeed = 0.0012;
-				const zoomFactor = Math.exp(delta * zoomSpeed);
-				cameraDistance *= zoomFactor;
-				cameraDistance = Math.max(minCameraDistance, Math.min(maxCameraDistance, cameraDistance));
-				updateCameraPosition();
-			}, { passive: false });
-		}
+		// Camera and input controllers
+		let cameraController;
+		let inputController;
 
 		function onWindowResize() {
 			const container = document.getElementById('canvas-container');
@@ -430,38 +361,18 @@ import { updateParameterUI } from './parameterUI.js';
 			if (!bounds) {
 				return;
 			}
-			const { center, size } = bounds;
-
-			const maxDim = Math.max(size.x, size.y, size.z);
-			const minSize = 10;
-			const effectiveSize = Math.max(maxDim, minSize);
-
-			const fov = camera.fov * (Math.PI / 180);
-			const distance = effectiveSize / (2 * Math.tan(fov / 2));
-			const paddedDistance = distance * 1.5;
-			const far = Math.max(1000, paddedDistance * 100);
-			const near = Math.max(0.01, far / 100000);
-
-			camera.near = near;
-			camera.far = far;
-			camera.updateProjectionMatrix();
-
-			cameraTarget.copy(center);
-			cameraDistance = paddedDistance;
-			minCameraDistance = Math.max(0.1, paddedDistance * 0.02);
-			maxCameraDistance = Math.max(minCameraDistance * 2, paddedDistance * 20);
-			cameraRotation.theta = Math.PI / 4;
-			cameraRotation.phi = Math.PI / 4;
-			updateCameraPosition();
+			
+			// Use camera controller to fit to view
+			cameraController.fitToView(bounds);
 
 			// Keep the key light aimed at the model center and tighten the shadow frustum
 			// so shadows are higher-res and less blocky.
 			if (keyLight) {
-				keyLight.target.position.copy(center);
+				keyLight.target.position.set(bounds.center.x, bounds.center.y, bounds.center.z);
 				keyLight.target.updateMatrixWorld(true);
 
 				if (SHADOW_PRESET.enabled && keyLight.castShadow) {
-					const maxDim = Math.max(size.x, size.y, size.z);
+					const maxDim = Math.max(bounds.size.x, bounds.size.y, bounds.size.z);
 					const extent = Math.max(15, Math.min(220, maxDim * 2.5));
 					keyLight.shadow.camera.left = -extent;
 					keyLight.shadow.camera.right = extent;
@@ -653,7 +564,24 @@ import { updateParameterUI } from './parameterUI.js';
 			floorMesh.visible = false;
 			scene.add(floorMesh);
 
-			setupControls();
+			// Initialize camera and input controllers
+			cameraController = new CameraController(camera, {
+				target: { x: 0, y: 0, z: 0 },
+				rotation: { theta: Math.PI / 4, phi: Math.PI / 4 },
+				distance: 50,
+				minDistance: 5,
+				maxDistance: 200
+			});
+			
+			// Sync controller from initial camera position
+			cameraController.syncFromCamera();
+			
+			// Initialize input controller
+			inputController = new InputController(canvas, cameraController, {
+				onInteraction: () => {
+					userHasInteracted = true;
+				}
+			});
 
 			const container = document.getElementById('canvas-container');
 			if (container && typeof ResizeObserver !== 'undefined') {
