@@ -57,7 +57,7 @@ import { InputController } from './inputController.js';
 		// Brighter, JSCAD-like CAD preview lighting + color management.
 		// These are the knobs to tweak if you want to tune the overall look.
 		const LIGHTING_PRESET = {
-			ambientIntensity: 0.35,
+			ambientIntensity: 0.5,
 			hemiIntensity: 1.0,
 			keyIntensity: 1.7,
 			fillIntensity: 0.65,
@@ -499,8 +499,9 @@ import { InputController } from './inputController.js';
 			hemiLight.position.set(0, 0, 1);
 			scene.add(hemiLight);
 
+			// Key light: from upper-left-front to differentiate top/side surfaces
 			keyLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.keyIntensity);
-			keyLight.position.set(30, 50, 25);
+			keyLight.position.set(-45, 35, 55);
 			keyLight.castShadow = SHADOW_PRESET.enabled;
 			if (SHADOW_PRESET.enabled) {
 				// Available in newer Three.js (r150+). Keep guarded for compatibility.
@@ -528,12 +529,14 @@ import { InputController } from './inputController.js';
 			// DirectionalLight shadows aim at its target.
 			scene.add(keyLight.target);
 
+			// Fill light: from lower-right to illuminate right-facing surfaces differently
 			const fillLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.fillIntensity);
-			fillLight.position.set(-35, 25, 15);
+			fillLight.position.set(55, 25, 25);
 			scene.add(fillLight);
 
+			// Rim light: edge definition from back
 			const rimLight = new THREE.DirectionalLight(0xffffff, LIGHTING_PRESET.rimIntensity);
-			rimLight.position.set(0, 15, -45);
+			rimLight.position.set(-25, -45, 25);
 			scene.add(rimLight);
 
 			gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x8899aa, 0xc5d0dd);
