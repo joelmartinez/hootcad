@@ -6,6 +6,8 @@ import { convertGeom3ToBufferGeometry, convertGeom2ToLineGeometry } from './conv
 import { updateParameterUI } from './parameterUI.js';
 import { CameraController } from './cameraController.js';
 import { InputController } from './inputController.js';
+import roughnessMapDataUrl from './roughness-map.png';
+import normalMapDataUrl from './normal-map.png';
 
 (function () {
 	function showBootError(error) {
@@ -57,7 +59,7 @@ import { InputController } from './inputController.js';
 		// Brighter, JSCAD-like CAD preview lighting + color management.
 		// These are the knobs to tweak if you want to tune the overall look.
 		const LIGHTING_PRESET = {
-			ambientIntensity: 0.5,
+			ambientIntensity: 0.7,
 			hemiIntensity: 1.0,
 			keyIntensity: 1.7,
 			fillIntensity: 0.65,
@@ -90,7 +92,7 @@ import { InputController } from './inputController.js';
 		const MATERIAL_PRESET = {
 			// Lower metalness keeps saturated plastics from looking "sooty" without an environment map.
 			metalness: 0.15,
-			roughness: 0.35
+			roughness: 0.65
 		};
 
 		// Very subtle, screen-space tilt-shift (fake shallow DoF).
@@ -139,6 +141,8 @@ import { InputController } from './inputController.js';
 		let floorMesh;
 		let floorMaterial;
 		let keyLight;
+		let roughnessMapTexture = null;
+		let normalMapTexture = null;
 		let animationFrameId = null;
 		let hasRenderedOnce = false; // Track if we've done initial render with auto-zoom
 		let userHasInteracted = false; // Track if user has moved camera
@@ -394,8 +398,11 @@ import { InputController } from './inputController.js';
 						const materialOptions = {
 							color: colorHex,
 							metalness: MATERIAL_PRESET.metalness,
-							roughness: MATERIAL_PRESET.roughness,
-							side: THREE.DoubleSide
+						roughness: MATERIAL_PRESET.roughness,
+						roughnessMap: roughnessMapTexture,
+						normalMap: normalMapTexture,
+						normalScale: new THREE.Vector2(0.12, 0.12),
+						side: THREE.DoubleSide
 						};
 						if (opacity < 1) {
 							materialOptions.transparent = true;
@@ -564,7 +571,18 @@ import { InputController } from './inputController.js';
 			floorMesh.receiveShadow = SHADOW_PRESET.enabled;
 			floorMesh.visible = false;
 			scene.add(floorMesh);
-
+		// Load surface texture maps
+		const textureLoader = new THREE.TextureLoader();
+		
+		roughnessMapTexture = textureLoader.load(roughnessMapDataUrl);
+		roughnessMapTexture.wrapS = THREE.RepeatWrapping;
+		roughnessMapTexture.wrapT = THREE.RepeatWrapping;
+		roughnessMapTexture.repeat.set(4, 4); // Tile the texture for finer detail
+		
+		normalMapTexture = textureLoader.load(normalMapDataUrl);
+		normalMapTexture.wrapS = THREE.RepeatWrapping;
+		normalMapTexture.wrapT = THREE.RepeatWrapping;
+		normalMapTexture.repeat.set(4, 4); // Match roughness map tiling
 			// Initialize camera and input controllers
 			cameraController = new CameraController(camera, {
 				target: { x: 0, y: 0, z: 0 },

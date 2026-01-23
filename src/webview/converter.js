@@ -23,6 +23,7 @@ export function triangulatePolygon(vertices) {
 export function convertGeom3ToBufferGeometry(geom3, THREE) {
 	const positions = [];
 	const normals = [];
+	const uvs = [];
 	
 	for (const polygon of geom3.polygons) {
 		const vertices = polygon.vertices;
@@ -58,6 +59,26 @@ export function convertGeom3ToBufferGeometry(geom3, THREE) {
 				const vertex = vertices[vertexIndex];
 				positions.push(vertex[0], vertex[1], vertex[2]);
 				normals.push(normal[0], normal[1], normal[2]);
+				
+				// Generate UV coordinates based on world position
+				// Use the two largest axes to avoid degenerate UVs
+				const absNormal = [Math.abs(normal[0]), Math.abs(normal[1]), Math.abs(normal[2])];
+				let u, v;
+				if (absNormal[2] > absNormal[0] && absNormal[2] > absNormal[1]) {
+					// Z is dominant - use XY plane
+					u = vertex[0];
+					v = vertex[1];
+				} else if (absNormal[1] > absNormal[0]) {
+					// Y is dominant - use XZ plane
+					u = vertex[0];
+					v = vertex[2];
+				} else {
+					// X is dominant - use YZ plane
+					u = vertex[1];
+					v = vertex[2];
+				}
+				// Scale UVs to create reasonable tiling
+				uvs.push(u * 0.1, v * 0.1);
 			}
 		}
 	}
@@ -65,6 +86,7 @@ export function convertGeom3ToBufferGeometry(geom3, THREE) {
 	const geometry = new THREE.BufferGeometry();
 	geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 	geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+	geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
 	return geometry;
 }
 

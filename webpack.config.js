@@ -69,6 +69,17 @@ const webviewConfig = {
       'three': path.resolve(__dirname, 'node_modules/three/build/three.module.js')
     }
   },
+  module: {
+    rules: [
+      {
+        test: /\.(png|jpg|jpeg)$/,
+        type: 'asset/resource',
+        generator: {
+          filename: '[name][ext]'
+        }
+      }
+    ]
+  },
   plugins: [
     new CopyWebpackPlugin({
       patterns: [
