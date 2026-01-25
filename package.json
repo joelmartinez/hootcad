@@ -3,8 +3,8 @@
   "displayName": "HootCAD",
   "description": "VS Code and Cursor extension to view JSCAD files",
   "version": "0.2.1",
-  "publisher": "Owl Precision",
-  "repository": {
+  "publisher": "owlprecision",
+"repository": {
     "type": "git",
     "url": "https://github.com/owlprecision/hootcad"
   },
