@@ -7,12 +7,12 @@ suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
 
 	test('HootCAD extension should be present', () => {
-		const extension = vscode.extensions.getExtension('hootcad.hootcad');
+		const extension = vscode.extensions.getExtension('owlprecision.hootcad');
 		assert.ok(extension, 'Extension should be present');
 	});
 
 	test('Extension should activate successfully', async () => {
-		const extension = vscode.extensions.getExtension('hootcad.hootcad');
+		const extension = vscode.extensions.getExtension('owlprecision.hootcad');
 		assert.ok(extension, 'Extension should exist');
 		
 		await extension.activate();
@@ -20,7 +20,7 @@ suite('Extension Test Suite', () => {
 	});
 
 	test('HootCAD: Open Preview command should be registered', async () => {
-		const extension = vscode.extensions.getExtension('hootcad.hootcad');
+		const extension = vscode.extensions.getExtension('owlprecision.hootcad');
 		assert.ok(extension, 'Extension should exist');
 		
 		// Ensure extension is activated before checking for commands

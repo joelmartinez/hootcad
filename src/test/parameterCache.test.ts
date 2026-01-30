@@ -9,7 +9,7 @@ suite('Parameter Cache Test Suite', () => {
 
     setup(async () => {
         // Get extension context
-        const extension = vscode.extensions.getExtension('hootcad.hootcad');
+        const extension = vscode.extensions.getExtension('owlprecision.hootcad');
         assert.ok(extension, 'Extension should exist');
         
         if (!extension.isActive) {

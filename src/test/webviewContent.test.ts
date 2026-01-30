@@ -11,7 +11,7 @@ suite('Webview Content Validation', () => {
 
 	suiteSetup(async () => {
 		// Get extension and activate it
-		const ext = vscode.extensions.getExtension('hootcad.hootcad');
+		const ext = vscode.extensions.getExtension('owlprecision.hootcad');
 		assert.ok(ext, 'Extension should be available');
 		
 		if (!ext.isActive) {
