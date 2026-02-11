@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -128,6 +129,11 @@ jobs:
       contents: read
 
     steps:
+      - name: Verify VS Code Marketplace PAT
+        run: npx -y @vscode/vsce verify-pat owlprecision
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PUBLISH_OWLPRECISION }}
+          
       - name: Download VSIX artifact
         uses: actions/download-artifact@v4
         with:
