@@ -118,6 +118,31 @@ export class CameraController {
 	}
 
 	/**
+	 * Set camera to an axis-aligned view
+	 * @param {string} axis - One of 'top', 'bottom', 'front', 'back', 'right', 'left', 'iso'
+	 */
+	setAxisView(axis) {
+		// Z-up convention: theta rotates in XY, phi is polar angle from +Z.
+		// Exact 0 and π are avoided (0.01 offset) to prevent gimbal singularities
+		// where the camera's up-vector aligns with the look direction.
+		const views = {
+			top:    { theta: Math.PI / 4,      phi: 0.01 },
+			bottom: { theta: Math.PI / 4,      phi: Math.PI - 0.01 },
+			front:  { theta: Math.PI / 2,      phi: Math.PI / 2 },
+			back:   { theta: -Math.PI / 2,     phi: Math.PI / 2 },
+			right:  { theta: 0,                phi: Math.PI / 2 },
+			left:   { theta: Math.PI,          phi: Math.PI / 2 },
+			iso:    { theta: Math.PI / 4,      phi: Math.PI / 4 }
+		};
+		const view = views[axis];
+		if (view) {
+			this.rotation.theta = view.theta;
+			this.rotation.phi = view.phi;
+			this.updatePosition();
+		}
+	}
+
+	/**
 	 * Set camera state
 	 */
 	setState(state) {

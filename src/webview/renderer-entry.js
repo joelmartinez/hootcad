@@ -32,7 +32,6 @@ import normalMapDataUrl from './normal-map.png';
 		const errorElement = document.getElementById('error-message');
 		const parameterPanel = document.getElementById('parameter-panel');
 		const parameterContent = document.getElementById('parameter-content');
-		const collapseButton = document.getElementById('collapse-button');
 
 		if (!canvas) {
 			throw new Error('Missing #renderCanvas');
@@ -51,9 +50,6 @@ import normalMapDataUrl from './normal-map.png';
 		}
 		if (!parameterContent) {
 			throw new Error('Missing #parameter-content');
-		}
-		if (!collapseButton) {
-			throw new Error('Missing #collapse-button');
 		}
 
 		// Brighter, JSCAD-like CAD preview lighting + color management.
@@ -130,6 +126,8 @@ import normalMapDataUrl from './normal-map.png';
 		// Three.js scene setup
 		let scene;
 		let camera;
+		let orthoCamera;
+		let isOrtho = false;
 		let renderer;
 		let postScene;
 		let postCamera;
@@ -166,6 +164,10 @@ import normalMapDataUrl from './normal-map.png';
 			// Update camera aspect ratio
 			camera.aspect = width / height;
 			camera.updateProjectionMatrix();
+
+			if (isOrtho) {
+				syncOrthoCamera();
+			}
 
 			// Update renderer size - this updates the canvas drawing buffer
 			renderer.setSize(width, height);
@@ -257,8 +259,32 @@ import normalMapDataUrl from './normal-map.png';
 			updatePostProcessingSize();
 		}
 
+		function syncOrthoCamera() {
+			if (!orthoCamera) {
+				return;
+			}
+			const d = cameraController.distance;
+			const fovRad = camera.fov * (Math.PI / 180);
+			const h = 2 * d * Math.tan(fovRad / 2);
+			const w = h * camera.aspect;
+			orthoCamera.left = -w / 2;
+			orthoCamera.right = w / 2;
+			orthoCamera.top = h / 2;
+			orthoCamera.bottom = -h / 2;
+			orthoCamera.near = camera.near;
+			orthoCamera.far = camera.far;
+			orthoCamera.position.copy(camera.position);
+			orthoCamera.quaternion.copy(camera.quaternion);
+			orthoCamera.updateProjectionMatrix();
+		}
+
 		function animate() {
 			animationFrameId = requestAnimationFrame(animate);
+
+			if (isOrtho) {
+				syncOrthoCamera();
+			}
+			const renderCam = isOrtho ? orthoCamera : camera;
 
 			if (floorMesh && floorMesh.visible && floorMaterial) {
 				const shouldGhost = camera.position.z < floorMesh.position.z;
@@ -280,11 +306,11 @@ import normalMapDataUrl from './normal-map.png';
 			if (TILT_SHIFT_PRESET.enabled && postTarget && postMaterial && postScene && postCamera) {
 				postMaterial.uniforms.tDiffuse.value = postTarget.texture;
 				renderer.setRenderTarget(postTarget);
-				renderer.render(scene, camera);
+				renderer.render(scene, renderCam);
 				renderer.setRenderTarget(null);
 				renderer.render(postScene, postCamera);
 			} else {
-				renderer.render(scene, camera);
+				renderer.render(scene, renderCam);
 			}
 		}
 
@@ -478,6 +504,9 @@ import normalMapDataUrl from './normal-map.png';
 			camera.position.set(30, 30, 30);
 			camera.lookAt(0, 0, 0);
 
+			orthoCamera = new THREE.OrthographicCamera(-50, 50, 50, -50, 0.1, 1000);
+			orthoCamera.up.set(0, 0, 1);
+
 
 			renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 			renderer.setSize(canvas.clientWidth, canvas.clientHeight);
@@ -616,11 +645,83 @@ import normalMapDataUrl from './normal-map.png';
 			loadingElement.style.display = 'none';
 		}
 
-		// Parameter panel collapse
-		document.getElementById('parameter-header')?.addEventListener('click', () => {
-			parameterContent.classList.toggle('collapsed');
-			collapseButton.textContent = parameterContent.classList.contains('collapsed') ? '▶' : '▼';
+		// ── Toolbar dropdown logic ────────────────────────────────────
+		function closeAllPanes() {
+			document.querySelectorAll('.toolbar-pane.open').forEach((pane) => {
+				pane.classList.remove('open');
+			});
+			document.querySelectorAll('.toolbar-btn.active').forEach((btn) => {
+				btn.classList.remove('active');
+				btn.setAttribute('aria-expanded', 'false');
+			});
+		}
+
+		function togglePane(btnId, paneId) {
+			const btn = document.getElementById(btnId);
+			const pane = document.getElementById(paneId);
+			if (!btn || !pane) {
+				return;
+			}
+			const isOpen = pane.classList.contains('open');
+			closeAllPanes();
+			if (!isOpen) {
+				pane.classList.add('open');
+				btn.classList.add('active');
+				btn.setAttribute('aria-expanded', 'true');
+			}
+		}
+
+		document.getElementById('params-btn')?.addEventListener('click', (e) => {
+			e.stopPropagation();
+			togglePane('params-btn', 'parameter-panel');
 		});
+
+		document.getElementById('camera-btn')?.addEventListener('click', (e) => {
+			e.stopPropagation();
+			togglePane('camera-btn', 'camera-panel');
+		});
+
+		// Close panes when clicking outside
+		document.addEventListener('click', () => {
+			closeAllPanes();
+		});
+
+		// Prevent clicks inside panes from closing them
+		document.querySelectorAll('.toolbar-pane').forEach((pane) => {
+			pane.addEventListener('click', (e) => e.stopPropagation());
+		});
+
+		// ── Camera controls ────────────────────────────────────────────
+		function toggleProjection() {
+			isOrtho = !isOrtho;
+			const btn = document.getElementById('toggle-projection-btn');
+			if (btn) {
+				btn.textContent = isOrtho ? '🔲 Orthographic' : '🔲 Perspective';
+				btn.classList.toggle('active', isOrtho);
+			}
+		}
+
+		document.getElementById('toggle-projection-btn')?.addEventListener('click', toggleProjection);
+
+		document.querySelectorAll('.axis-btn').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const axis = btn.getAttribute('data-axis');
+				if (axis && cameraController) {
+					cameraController.setAxisView(axis);
+					userHasInteracted = true;
+				}
+				closeAllPanes();
+			});
+		});
+
+		// ── Toolbar collapse (hide labels when narrow) ─────────────────
+		const toolbar = document.getElementById('toolbar');
+		if (toolbar && typeof ResizeObserver !== 'undefined') {
+			const toolbarObserver = new ResizeObserver(() => {
+				toolbar.classList.toggle('collapsed', toolbar.clientWidth < 380);
+			});
+			toolbarObserver.observe(toolbar);
+		}
 
 		// Message handling
 		window.addEventListener('message', (event) => {

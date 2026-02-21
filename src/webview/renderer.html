@@ -9,21 +9,49 @@
 </head>
 <body>
 	<div id="container">
-		<div id="header">
-			<h1>HootCAD Preview</h1>
+		<div id="toolbar">
+			<span id="toolbar-title">HootCAD</span>
+			<div id="toolbar-items">
+				<div class="toolbar-item" id="params-item">
+					<button class="toolbar-btn" id="params-btn" title="Parameters" aria-haspopup="true" aria-expanded="false">
+						<span class="toolbar-icon" aria-hidden="true">⚙️</span>
+						<span class="toolbar-label">Parameters</span>
+					</button>
+					<div class="toolbar-pane" id="parameter-panel" role="dialog" aria-label="Parameters">
+						<div id="parameter-content"></div>
+					</div>
+				</div>
+				<div class="toolbar-item" id="camera-item">
+					<button class="toolbar-btn" id="camera-btn" title="Camera" aria-haspopup="true" aria-expanded="false">
+						<span class="toolbar-icon" aria-hidden="true">📷</span>
+						<span class="toolbar-label">Camera</span>
+					</button>
+					<div class="toolbar-pane" id="camera-panel" role="dialog" aria-label="Camera Controls">
+						<div class="camera-section">
+							<div class="camera-section-title">Projection</div>
+							<button class="camera-action-btn" id="toggle-projection-btn">🔲 Perspective</button>
+						</div>
+						<div class="camera-section">
+							<div class="camera-section-title">View</div>
+							<div class="camera-axis-grid">
+								<button class="camera-action-btn axis-btn" data-axis="top" aria-label="Set camera to top view">⬆ Top</button>
+								<button class="camera-action-btn axis-btn" data-axis="front" aria-label="Set camera to front view">◻ Front</button>
+								<button class="camera-action-btn axis-btn" data-axis="right" aria-label="Set camera to right view">▷ Right</button>
+								<button class="camera-action-btn axis-btn" data-axis="left" aria-label="Set camera to left view">◁ Left</button>
+								<button class="camera-action-btn axis-btn" data-axis="back" aria-label="Set camera to back view">◻ Back</button>
+								<button class="camera-action-btn axis-btn" data-axis="bottom" aria-label="Set camera to bottom view">⬇ Bottom</button>
+								<button class="camera-action-btn axis-btn" data-axis="iso" aria-label="Set camera to isometric view">⟁ Iso</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 		<div id="canvas-container">
 			<canvas id="renderCanvas"></canvas>
 			<div id="vignette" aria-hidden="true"></div>
 			<div id="loading" class="loading">Loading...</div>
 			<div id="error-message"></div>
-			<div id="parameter-panel">
-				<div id="parameter-header">
-					<div id="parameter-title">Parameters</div>
-					<button id="collapse-button" title="Collapse/Expand">▼</button>
-				</div>
-				<div id="parameter-content"></div>
-			</div>
 		</div>
 		<div id="status">Status: Initializing...</div>
 	</div>

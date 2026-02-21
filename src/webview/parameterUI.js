@@ -11,12 +11,23 @@
  * @param {Object} vscode - VS Code API object
  */
 export function updateParameterUI(parameters, parameterPanel, parameterContent, vscode) {
+	// Find the parent toolbar item (if using new toolbar layout)
+	const toolbarItem = parameterPanel.closest('.toolbar-item');
+
 	if (!parameters || !parameters.definitions || parameters.definitions.length === 0) {
-		parameterPanel.classList.remove('visible');
+		if (toolbarItem) {
+			toolbarItem.classList.remove('has-params');
+		} else {
+			parameterPanel.classList.remove('visible');
+		}
 		return;
 	}
-	
-	parameterPanel.classList.add('visible');
+
+	if (toolbarItem) {
+		toolbarItem.classList.add('has-params');
+	} else {
+		parameterPanel.classList.add('visible');
+	}
 	parameterContent.innerHTML = '';
 	
 	for (const def of parameters.definitions) {
